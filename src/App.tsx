@@ -7,7 +7,7 @@ import { PrintMonth } from './components/PrintMonth';
 import { Settings } from './components/Settings';
 import { Setup } from './components/Setup';
 import { Today } from './components/Today';
-import { fireAndForget, updateChores, watchChores, watchHousehold } from './db';
+import { fireAndForget, saveHousehold, updateChores, watchChores, watchHousehold } from './db';
 import { auth, firebaseConfigured } from './firebase';
 import type { Chore, Household } from './types';
 import { DEFAULT_DAILY_LIMIT, coverFreeDays, todayStr } from './rotation';
@@ -85,7 +85,16 @@ function Main() {
       </header>
       {tab === 'Today' && <Today {...props} />}
       {tab === 'Chores' && <ChoreList {...props} rooms={household.home?.rooms ?? []} />}
-      {tab === 'Print' && <PrintMonth chores={chores} members={household.members} rooms={household.home?.rooms ?? []} dailyLimit={dailyLimit} />}
+      {tab === 'Print' && (
+        <PrintMonth
+          chores={chores}
+          members={household.members}
+          rooms={household.home?.rooms ?? []}
+          dailyLimit={dailyLimit}
+          notes={household.notes ?? {}}
+          onNote={(key, text) => fireAndForget(saveHousehold(user.uid, { notes: { [key]: text } }))}
+        />
+      )}
       {tab === 'History' && <History uid={user.uid} members={household.members} />}
       {tab === 'Settings' && <Settings uid={user.uid} household={household} chores={chores} />}
     </div>

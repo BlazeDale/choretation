@@ -55,6 +55,7 @@ export function ChoreCalendar({
     const i = members.findIndex((m) => m.id === id);
     return i < 0 ? 'var(--muted)' : CRAYONS[i % CRAYONS.length];
   };
+  const avatarOf = (id: string | null) => members.find((m) => m.id === id)?.avatar;
   const locations = useMemo(() => locationsFor(chores.map((c) => c.area), rooms), [chores, rooms]);
 
   const byDay = useMemo(() => {
@@ -147,7 +148,7 @@ export function ChoreCalendar({
               )}
               {list.length > 0 && (
                 <span className="ccal-patch" style={{ '--c': crayon(list[0].memberId) } as CSSProperties}>
-                  <ArtImg artKey={artKey(list[0].chore.name)} />
+                  <ArtImg key={avatarOf(list[0].memberId)} artKey={artKey(list[0].chore.name)} avatar={avatarOf(list[0].memberId)} />
                 </span>
               )}
               {list.length > 0 && (
@@ -190,7 +191,7 @@ export function ChoreCalendar({
             {pickedList.map((x, j) => (
               <li key={j} style={{ '--c': crayon(x.memberId) } as CSSProperties}>
                 <span className="ccal-patch small">
-                  <ArtImg artKey={artKey(x.chore.name)} />
+                  <ArtImg key={avatarOf(x.memberId)} artKey={artKey(x.chore.name)} avatar={avatarOf(x.memberId)} />
                 </span>
                 <span className="ccal-day-main">
                   <strong>{x.chore.name}</strong>

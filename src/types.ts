@@ -67,6 +67,8 @@ export interface Member {
   name: string;
   /** Days of the week (0 = Sunday) this person gets no chores. */
   freeDays?: number[];
+  /** Character shown doing their chores (see AVATARS); the default kid when unset. */
+  avatar?: string;
 }
 
 export interface ChoreDraft {
@@ -82,7 +84,10 @@ export interface ChoreDraft {
 
 export interface Chore extends ChoreDraft {
   id: string;
+  /** Who does it next. Rotates after each completion unless the chore has an owner. */
   assigneeId: string | null;
+  /** Set when the chore always belongs to one person ("Anyone" in the list when unset). */
+  owner?: string | null;
   /** Local date, YYYY-MM-DD. */
   nextDue: string;
   lastDone: string | null;
@@ -98,6 +103,8 @@ export interface Household {
   home: HomeConfig | null;
   /** Max chore minutes per person per day that "Redistribute" aims for. */
   dailyLimit?: number;
+  /** Notes printed on someone's calendar page, keyed by noteKey(memberId, year, month). */
+  notes?: Record<string, string>;
 }
 
 export interface HistoryEntry {

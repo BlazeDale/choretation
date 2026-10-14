@@ -3,3 +3,6 @@ dist
 .env.local
 .firebase
 *.log
+
+# Personal avatar art (real people): never commit; the public site must not serve it
+avatars-private/

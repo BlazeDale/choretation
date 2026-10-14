@@ -18,6 +18,7 @@ import type { Chore, HomeConfig, Household, Member } from '../types';
 import { ChorePicker } from './ChorePicker';
 import { HomeForm } from './HomeForm';
 import { RedistributeButton } from './Redistribute';
+import { AvatarPicker } from './AvatarPicker';
 import { ThemePicker } from './ThemePicker';
 
 export function Settings({ uid, household, chores }: { uid: string; household: Household; chores: Chore[] }) {
@@ -36,11 +37,12 @@ export function Settings({ uid, household, chores }: { uid: string; household: H
     const remaining = members.filter((x) => x.id !== m.id);
     if (!remaining.length || !confirm(`Remove ${m.name}? Their chores will be handed to others.`)) return;
     const load = memberLoads(chores, remaining);
-    const patches: Array<[string, { assigneeId: string | null }]> = [];
-    for (const c of chores.filter((c) => c.assigneeId === m.id)) {
+    const patches: Array<[string, { assigneeId: string | null; owner?: null }]> = [];
+    // Their chores (including ones that were always theirs) go back into the rotation.
+    for (const c of chores.filter((c) => c.assigneeId === m.id || c.owner === m.id)) {
       const id = pickAssignee(load, availableOn(remaining, c.nextDue));
       if (id) load.set(id, load.get(id)! + (c.minutes * 7) / c.everyDays);
-      patches.push([c.id, { assigneeId: id }]);
+      patches.push([c.id, c.owner === m.id ? { assigneeId: id, owner: null } : { assigneeId: id }]);
     }
     setMembers(remaining);
     fireAndForget(updateChores(uid, patches));
@@ -133,6 +135,10 @@ export function Settings({ uid, household, chores }: { uid: string; household: H
                 `Updated ${m.name}'s free days${moved.length ? ` and moved ${moved.length} chores off them` : ''}.`,
               );
             }}
+          />
+          <AvatarPicker
+            value={m.avatar}
+            onChange={(avatar) => setMembers(members.map((x) => (x.id === m.id ? { ...x, avatar } : x)))}
           />
           </div>
         ))}

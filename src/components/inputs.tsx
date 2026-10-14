@@ -77,3 +77,25 @@ export function WeekdaySelect({ value, onChange }: { value: number | null | unde
     </select>
   );
 }
+
+/** Who a chore belongs to: one person for good, or anyone (it rotates). */
+export function OwnerSelect({
+  members,
+  value,
+  onChange,
+}: {
+  members: Member[];
+  value: string | null | undefined;
+  onChange: (owner: string | null) => void;
+}) {
+  return (
+    <select value={value ?? ''} onChange={(e) => onChange(e.target.value || null)} aria-label="Whose chore">
+      <option value="">Anyone (rotates)</option>
+      {members.map((m) => (
+        <option key={m.id} value={m.id}>
+          Always {m.name}
+        </option>
+      ))}
+    </select>
+  );
+}

@@ -116,6 +116,11 @@ h4.level { margin: 12px 0 6px; font-size: 0.95rem; }
 .chip.on { background: var(--brand); color: var(--on-brand); border-color: var(--brand); }
 .member { margin-bottom: 12px; }
 .member .inline { margin-bottom: 4px; }
+.avatars { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin-top: 6px; }
+.avatar { display: flex; align-items: center; gap: 6px; padding: 3px 10px 3px 3px; border-radius: 999px; font-size: 0.9rem; }
+.avatar[aria-pressed='true'] { border-color: var(--brand); box-shadow: 0 0 0 1.5px var(--brand); }
+/* Line art is black on white: keep it on a white disc in every theme. */
+.portrait { width: 30px; height: 30px; border-radius: 50%; background: #fff; object-fit: cover; border: 1px solid var(--border); }
 .free-days { display: flex; gap: 4px; align-items: center; flex-wrap: wrap; }
 .free-days .chip { padding: 3px 9px; font-size: 0.85rem; }
 
@@ -326,7 +331,8 @@ h4.level { margin: 12px 0 6px; font-size: 0.95rem; }
 .cal-pic { flex: 1 1 0; min-height: 44px; display: flex; justify-content: center; padding: 2px 0 1px; }
 .cal-pic .art-img { width: 100%; height: 100%; }
 /* At the smallest text size, the picture gives way rather than spilling out of the cell. */
-.cal-cell.lvl-3 .cal-pic { min-height: 0; }
+.cal-cell.lvl-3 .cal-pic { min-height: 17px; } /* still clears the day number */
+.cal-more { padding-left: 1.2em; }
 .cal-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 1px; min-height: 0; }
 .cal-list li { display: flex; align-items: center; gap: 3px; line-height: 1.1; }
 .cal-list li span:last-child { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
@@ -341,6 +347,9 @@ h4.level { margin: 12px 0 6px; font-size: 0.95rem; }
 /* Until outline drawings exist, emoji stand in, greyed so they read as uncolored. */
 .loc-emoji { font-size: 0.9em; font-family: 'Segoe UI Emoji', 'Apple Color Emoji', 'Noto Color Emoji', sans-serif; filter: grayscale(1) contrast(1.2); }
 .loc sub { font-family: 'Fredoka', system-ui, sans-serif; font-size: 0.75em; font-weight: 600; line-height: 1; margin-left: -1px; }
+.sheet-note { flex: none; display: flex; align-items: baseline; gap: 10px; border: 2px dashed var(--ink); border-radius: 12px; padding: 4px 12px 5px; font-size: 16px; line-height: 1.2; }
+.sheet-note .hollow { --o: 1.1px; font-size: 18px; letter-spacing: 0.5px; }
+.note-field { width: 100%; max-width: 560px; }
 .legend { flex: none; display: flex; flex-wrap: wrap; align-items: center; gap: 2px 12px; font-size: 12px; line-height: 1.2; }
 .legend strong { font-family: 'Fredoka', system-ui, sans-serif; }
 .legend-item { white-space: nowrap; display: inline-flex; align-items: center; gap: 3px; }

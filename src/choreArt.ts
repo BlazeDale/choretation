@@ -46,8 +46,27 @@ export function artKey(choreName: string): string {
 
 const COLORING = `${import.meta.env.BASE_URL}coloring`;
 
-/** Someone doing the chore first, then the plain object drawing. */
-export const artUrls = (key: string) => [`${COLORING}/doing/${key}.png`, `${COLORING}/${key}.png`];
+/** Characters a person can pick to appear in their chore pictures. */
+export interface Avatar {
+  id: string;
+  name: string;
+}
+/** The first is the default: the kid from coloring/doing. Others live in coloring/avatars/<id>/. */
+export const AVATARS: Avatar[] = [
+  { id: 'kid', name: 'Kiddo' },
+  { id: 'wife', name: 'Curly' },
+];
+export const DEFAULT_AVATAR = AVATARS[0].id;
+
+/** The avatar doing the chore, then the default kid doing it, then the plain object drawing. */
+export function artUrls(key: string, avatar = DEFAULT_AVATAR): string[] {
+  const urls = [`${COLORING}/doing/${key}.png`, `${COLORING}/${key}.png`];
+  return avatar === DEFAULT_AVATAR ? urls : [`${COLORING}/avatars/${avatar}/${key}.png`, ...urls];
+}
+
+/** Head-and-shoulders picture for the avatar picker. */
+export const portraitUrl = (avatar: string) =>
+  avatar === DEFAULT_AVATAR ? `${COLORING}/doing/sparkle.png` : `${COLORING}/avatars/${avatar}/portrait.png`;
 
 /** Name for a calendar cell: drops the detail after a colon ("Laundry: wash, dry, fold…" -> "Laundry"). */
 export const cellName = (choreName: string) => choreName.replace(/:[^-]*/, '').trim();

@@ -1,5 +1,5 @@
 import { useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { artKey, artUrls } from '../choreArt';
+import { artKey } from '../choreArt';
 import { compactName, locationsFor, type Location } from '../locations';
 import { ArtImg, LocationMark } from './Art';
 import { projectMonth, todayStr } from '../rotation';
@@ -12,16 +12,25 @@ const CHEERS = ['You shine!', 'Superstar mode', 'Reach for the stars', 'Sparkle 
 const DENSITY = ['roomy', 'snug', 'snug one-line', 'tight one-line'];
 const startDensity = (n: number) => (n <= 3 ? 0 : n <= 5 ? 1 : 3);
 
+const NOTE_MAX = 160;
+/** One note per person per month, so last month's note doesn't print on this month's page. */
+export const noteKey = (memberId: string, year: number, month0: number) =>
+  `${memberId}_${year}-${String(month0 + 1).padStart(2, '0')}`;
+
 export function PrintMonth({
   chores,
   members,
   rooms,
   dailyLimit,
+  notes,
+  onNote,
 }: {
   chores: Chore[];
   members: Member[];
   rooms: Room[];
   dailyLimit: number;
+  notes: Record<string, string>;
+  onNote: (key: string, text: string) => void;
 }) {
   const now = new Date();
   const [offset, setOffset] = useState(0);
@@ -80,6 +89,25 @@ export function PrintMonth({
             </label>
           ))}
         </div>
+        {members
+          .filter((m) => picked.has(m.id))
+          .map((m) => {
+            const key = noteKey(m.id, year, month0);
+            return (
+              <label key={key} className="note-field">
+                Note on {m.name}'s {monthName} page (optional)
+                <input
+                  defaultValue={notes[key] ?? ''}
+                  maxLength={NOTE_MAX}
+                  placeholder="e.g. Great job last month! Piano is on Tuesdays now."
+                  onBlur={(e) => {
+                    const text = e.target.value.trim();
+                    if (text !== (notes[key] ?? '')) onNote(key, text);
+                  }}
+                />
+              </label>
+            );
+          })}
         <button className="primary" disabled={!picked.size} onClick={() => window.print()}>
           🖨️ Print chore calendars
         </button>
@@ -95,6 +123,7 @@ export function PrintMonth({
           .map((m) => {
             const days = byMember.get(m.id) ?? new Map<number, Chore[]>();
             const cheer = CHEERS[(m.name.length + month0) % CHEERS.length];
+            const note = notes[noteKey(m.id, year, month0)]?.trim();
             const areas = new Set<string>();
             for (const [d, list] of days) if (!isPast(d)) for (const c of list) areas.add(c.area);
             const legend = [...areas].sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
@@ -103,7 +132,7 @@ export function PrintMonth({
               <div className="sheet-scroll" key={m.id}>
                 <section className="sheet">
                   <header className="sheet-head">
-                    <Banner />
+                    <Banner key={month0} month0={month0} />
                     <div className="sheet-title">
                       <span className="sheet-name hollow">{m.name}'s</span>
                       <span className="sheet-sub hollow">Chore Calendar</span>
@@ -126,11 +155,17 @@ export function PrintMonth({
                       const list = past ? [] : (days.get(d) ?? []);
                       const cls = past ? 'cal-cell past' : 'cal-cell';
                       return (
-                        <DayCell key={i} className={cls} day={d} chores={list} locations={locations} free={!past && !list.length} />
+                        <DayCell key={i} className={cls} day={d} chores={list} avatar={m.avatar} locations={locations} free={!past && !list.length} fitKey={note ?? ''} />
                       );
                     })}
                   </div>
 
+                  {note && (
+                    <div className="sheet-note">
+                      <span className="hollow">Note</span>
+                      <span>{note}</span>
+                    </div>
+                  )}
                   {legend.length > 0 && (
                     <div className="legend">
                       <strong>Where:</strong>
@@ -163,28 +198,38 @@ function DayCell({
   className,
   day,
   chores,
+  avatar,
   locations,
   free,
+  fitKey,
 }: {
   className: string;
   day: number;
   chores: Chore[];
+  avatar?: string;
   locations: Map<string, Location>;
   free: boolean;
+  /** Changes when something else on the page takes space (a note), so the cell re-fits. */
+  fitKey: string;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const [level, setLevel] = useState(() => startDensity(chores.length));
+  // As a last resort, list fewer chores and end with "+ N more" rather than clipping.
+  const [shown, setShown] = useState(chores.length);
   const [fontsReady, setFontsReady] = useState(false);
   useLayoutEffect(() => {
     setLevel(startDensity(chores.length));
-  }, [chores.length]);
+    setShown(chores.length);
+  }, [chores.length, fitKey]);
   useLayoutEffect(() => {
     document.fonts.ready.then(() => setFontsReady(true));
   }, []);
   useLayoutEffect(() => {
     const el = ref.current;
-    if (el && el.scrollHeight > el.clientHeight + 1 && level < DENSITY.length - 1) setLevel(level + 1);
-  }, [level, fontsReady, chores]);
+    if (!el || el.scrollHeight <= el.clientHeight + 1) return;
+    if (level < DENSITY.length - 1) setLevel(level + 1);
+    else if (shown > 1) setShown(shown - 1);
+  }, [level, shown, fontsReady, chores]);
 
   const biggest = chores.reduce<Chore | null>((b, c) => (!b || c.minutes > b.minutes ? c : b), null);
 
@@ -193,17 +238,18 @@ function DayCell({
       <span className="cal-num hollow">{day}</span>
       {biggest && (
         <div className="cal-pic">
-          <ArtImg artKey={artKey(biggest.name)} />
+          <ArtImg key={avatar} artKey={artKey(biggest.name)} avatar={avatar} />
         </div>
       )}
       {chores.length > 0 && (
         <ul className={`cal-list ${DENSITY[level]}`}>
-          {chores.map((c, j) => (
+          {chores.slice(0, shown).map((c, j) => (
             <li key={j}>
               <LocationMark loc={locations.get(c.area)} />
               <span>{compactName(c.name, c.area)}</span>
             </li>
           ))}
+          {shown < chores.length && <li className="cal-more">+ {chores.length - shown} more</li>}
         </ul>
       )}
       {free && <span className="cal-free hollow">Free day!</span>}
@@ -211,11 +257,13 @@ function DayCell({
   );
 }
 
-/** Coloring-page banner behind the header, falling back to the drawn doodles. */
-function Banner() {
-  const [missing, setMissing] = useState(false);
-  if (missing) return <Doodles />;
-  return <img className="banner" src={artUrls('banner')[1]} alt="" onError={() => setMissing(true)} />;
+/** The month's seasonal coloring banner, then the everyday one, then drawn doodles. */
+function Banner({ month0 }: { month0: number }) {
+  const base = `${import.meta.env.BASE_URL}coloring`;
+  const urls = [`${base}/months/${String(month0 + 1).padStart(2, '0')}.png`, `${base}/banner.png`];
+  const [tries, setTries] = useState(0);
+  if (tries >= urls.length) return <Doodles />;
+  return <img key={urls[tries]} className="banner" src={urls[tries]} alt="" onError={() => setTries((t) => t + 1)} />;
 }
 
 /** Hand-drawn style sparkles, a moon and a swoosh for the header. */

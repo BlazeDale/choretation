@@ -4,7 +4,7 @@ import { formatMinutes } from '../format';
 import { MAX_MINUTES } from '../generator';
 import { memberLoads, nextWeekday, scheduleNew, todayStr, weekdayOf } from '../rotation';
 import type { Chore, ChoreDraft, Member, NewChore, Room } from '../types';
-import { FrequencySelect, MemberSelect, MinutesInput, WeekdaySelect } from './inputs';
+import { FrequencySelect, MinutesInput, OwnerSelect, WeekdaySelect } from './inputs';
 import { ChoreCalendar } from './ChoreCalendar';
 import { RedistributeButton } from './Redistribute';
 
@@ -176,7 +176,12 @@ export function ChoreList({
                         )
                       }
                     />
-                    <MemberSelect members={members} value={c.assigneeId} onChange={(assigneeId) => save(c.id, { assigneeId })} />
+                    <OwnerSelect
+                      members={members}
+                      value={c.owner}
+                      // Fixing a chore to someone hands it to them now; "Anyone" leaves the current turn as is.
+                      onChange={(owner) => save(c.id, owner ? { owner, assigneeId: owner } : { owner: null })}
+                    />
                     <input
                       type="date"
                       aria-label="Next due"

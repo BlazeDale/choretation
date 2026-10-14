@@ -59,6 +59,15 @@ export const THEMES: Theme[] = [
     },
   },
   {
+    id: 'bubblegum',
+    name: 'Bubblegum',
+    mode: 'light',
+    vars: {
+      bg: '#ffeef6', surface: '#fffafc', text: '#3d1631', muted: '#8a4f74', border: '#f8c6dd',
+      brand: '#d1287e', onBrand: '#ffffff', brandSoft: '#ffd9eb', danger: '#b4232a', overdue: '#ffe1e6',
+    },
+  },
+  {
     id: 'lemon',
     name: 'Lemon zest',
     mode: 'light',

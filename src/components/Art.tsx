@@ -19,9 +19,9 @@ function PlaceImg({ loc }: { loc: Location }) {
   return <img src={`${import.meta.env.BASE_URL}coloring/places/${loc.key}.png`} alt="" onError={() => setMissing(true)} />;
 }
 
-/** Picture of someone doing the chore, falling back to the plain drawing, then a sparkle. */
-export function ArtImg({ artKey: key }: { artKey: string }) {
-  const urls = artUrls(key);
+/** Picture of the person's avatar doing the chore, falling back to the plain drawing, then a sparkle. */
+export function ArtImg({ artKey: key, avatar }: { artKey: string; avatar?: string }) {
+  const urls = artUrls(key, avatar);
   const [tries, setTries] = useState(0);
   if (tries >= urls.length) {
     return (
@@ -30,5 +30,5 @@ export function ArtImg({ artKey: key }: { artKey: string }) {
       </svg>
     );
   }
-  return <img className="art-img" src={urls[tries]} alt="" onError={() => setTries((t) => t + 1)} />;
+  return <img key={urls[tries]} className="art-img" src={urls[tries]} alt="" onError={() => setTries((t) => t + 1)} />;
 }

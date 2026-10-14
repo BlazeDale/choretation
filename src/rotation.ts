@@ -152,12 +152,14 @@ export function completion(
   dailyLimit = DEFAULT_DAILY_LIMIT,
 ) {
   const others = all.filter((c) => c.id !== chore.id);
-  // When nobody's around that day (e.g. a one-person home on its day off), move to the next day someone is.
-  const nextDue = pinned(chore) ? nextDueAfter(chore, today) : nextWorkingDay(members, nextDueAfter(chore, today));
+  const owner = ownerOf(chore, members);
+  // A fixed chore waits for its owner's next working day; a rotating one for the next day anyone's around.
+  const after = nextDueAfter(chore, today);
+  const nextDue = pinned(chore) ? after : owner ? nextDayFor(members, owner, after) : nextWorkingDay(members, after);
   const fit = { day: dayLoads(others, members, nextDue), minutes: chore.minutes, limit: dailyLimit };
   return {
     nextDue,
-    assigneeId: pickAssignee(memberLoads(others, members), availableOn(members, nextDue), doneBy, fit),
+    assigneeId: owner ?? pickAssignee(memberLoads(others, members), availableOn(members, nextDue), doneBy, fit),
     lastDone: today,
     lastDoneBy: doneBy,
   };
@@ -166,9 +168,22 @@ export function completion(
 const isFree = (members: Member[], id: string | null, date: string) =>
   !!members.find((m) => m.id === id)?.freeDays?.includes(weekdayOf(date));
 
+/** The person a chore always belongs to, if it's fixed to someone still in the household. */
+export const ownerOf = (c: Pick<Chore, 'owner'>, members: Member[]) =>
+  c.owner && members.some((m) => m.id === c.owner) ? c.owner : null;
+
+/** `date`, or the first day after it that isn't one of `id`'s free days. */
+function nextDayFor(members: Member[], id: string, date: string): string {
+  for (let i = 0; i < 7; i++) {
+    const d = addDays(date, i);
+    if (!isFree(members, id, d)) return d;
+  }
+  return date;
+}
+
 /**
- * Keeps chores off people's free days. A chore due on its assignee's free day goes to someone who's
- * around; if nobody is (everyone's off, or it's a one-person home), it moves to the next day
+ * Keeps chores off people's free days. A chore fixed to someone moves to their next working day.
+ * Otherwise a chore due on its assignee's free day goes to someone who's around; if nobody is (everyone's off, or it's a one-person home), it moves to the next day
  * someone is, unless it's pinned to that weekday. Overdue chores count as due today, since that's
  * when they still need doing. Returns only the chores that change.
  */
@@ -184,6 +199,15 @@ export function coverFreeDays(
     if (!c.active) continue;
     const patch: Partial<Pick<Chore, 'assigneeId' | 'nextDue'>> = {};
     let due = c.nextDue < today ? today : c.nextDue;
+    const owner = ownerOf(c, members);
+    if (owner) {
+      // Fixed chores stay with their owner; one landing on their day off waits for their next working day.
+      if (!pinned(c) && isFree(members, owner, due)) {
+        patch.nextDue = c.nextDue = nextDayFor(members, owner, due);
+        changes.push([c.id, patch]);
+      }
+      continue;
+    }
     if (!pinned(c) && everyoneFree(members, due)) {
       due = nextWorkingDay(members, due);
       patch.nextDue = c.nextDue = due;
@@ -238,13 +262,16 @@ export function projectMonth(
   return out;
 }
 
-/** Reassigns every active chore from scratch. Returns only the chores whose assignee changes. */
+/** Reassigns every rotating chore from scratch (fixed ones stay with their owner). Returns only changes. */
 export function rebalance(all: Chore[], members: Member[]): Array<[string, string | null]> {
   const load = new Map(members.map((m) => [m.id, 0]));
   const changes: Array<[string, string | null]> = [];
-  const active = all.filter((c) => c.active).sort((a, b) => weeklyMinutes(b) - weeklyMinutes(a));
+  // Fixed chores first, so the rotating ones balance around them.
+  const active = all
+    .filter((c) => c.active)
+    .sort((a, b) => Number(!!ownerOf(b, members)) - Number(!!ownerOf(a, members)) || weeklyMinutes(b) - weeklyMinutes(a));
   for (const c of active) {
-    const id = pickAssignee(load, availableOn(members, c.nextDue));
+    const id = ownerOf(c, members) ?? pickAssignee(load, availableOn(members, c.nextDue));
     if (id) load.set(id, load.get(id)! + weeklyMinutes(c));
     if (id !== c.assigneeId) changes.push([c.id, id]);
   }
@@ -258,7 +285,8 @@ const NEAR = 28;
 /**
  * Re-plans due dates and assignees so chores spread evenly across days. Each chore keeps its
  * frequency and is due within one period from today; chores pinned to a weekday keep their dates.
- * People's free days lower that day's capacity, and nobody is given a chore on their free day. Chores are placed on the offset that keeps
+ * People's free days lower that day's capacity, and nobody is given a chore on their free day.
+ * Chores fixed to someone keep that person and are spread over their own working days. Chores are placed on the offset that keeps
  * the busiest of its days lowest (most constrained first), aiming to keep the household under
  * `dailyLimit` per person; then each is given to whoever stays under the limit that day with the
  * least weekly load. Returns only the chores that change.
@@ -270,31 +298,56 @@ export function redistribute(
   today = todayStr(),
 ): Array<[string, Pick<Chore, 'nextDue' | 'assigneeId'>]> {
   const active = all.filter((c) => c.active);
-  // How much the household can take on each day, counting only people not on a free day.
   const firstWeekday = weekdayOf(today);
+  const weekdayAt = (d: number) => (firstWeekday + d) % 7;
+  // How much the household can take on each day, counting only people not on a free day.
   const capByWeekday = Array.from(
     { length: 7 },
     (_, w) => dailyLimit * members.filter((m) => !m.freeDays?.includes(w)).length,
   );
-  const cap = (d: number) => capByWeekday[(firstWeekday + d) % 7];
-  // Where a repeat really happens: one falling on a day nobody's around moves to the next day someone is.
-  const land = (d: number) => {
+  // A fixed chore is measured against its owner's own day instead.
+  const capFor = (owner: string | null) => (d: number) =>
+    owner
+      ? members.find((m) => m.id === owner)?.freeDays?.includes(weekdayAt(d))
+        ? 0
+        : dailyLimit
+      : capByWeekday[weekdayAt(d)];
+  // Where a repeat really happens: one falling on a day off moves to the next working day.
+  const landFor = (cap: (d: number) => number) => (d: number) => {
     for (let x = d; x < Math.min(HORIZON, d + 7); x++) if (cap(x)) return x;
     return d;
   };
   const total = new Array<number>(HORIZON).fill(0);
+  const personal = new Map<string, number[]>();
+  const loadOf = (owner: string) => {
+    if (!personal.has(owner)) personal.set(owner, new Array<number>(HORIZON).fill(0));
+    return personal.get(owner)!;
+  };
+  const place = (owner: string | null, d: number, minutes: number) => {
+    total[d] += minutes;
+    if (owner) loadOf(owner)[d] += minutes;
+  };
   const offsets = new Map<string, number>();
+  const fixedFirst = (a: Chore, b: Chore) => Number(!!ownerOf(b, members)) - Number(!!ownerOf(a, members));
 
   // Pinned chores stay put; place them first so everything else works around them.
   for (const c of active.filter(pinned)) {
     const o = Math.max(0, daysUntil(c.nextDue, today));
-    for (let d = o; d < HORIZON; d += c.everyDays) total[d] += c.minutes;
+    for (let d = o; d < HORIZON; d += c.everyDays) place(ownerOf(c, members), d, c.minutes);
     offsets.set(c.id, o);
   }
-  for (const c of [...active].filter((c) => !pinned(c)).sort((a, b) => a.everyDays - b.everyDays || b.minutes - a.minutes)) {
+  // Then fixed chores (only their owner's days will do), then rotating ones; most constrained first.
+  const flexible = active
+    .filter((c) => !pinned(c))
+    .sort((a, b) => fixedFirst(a, b) || a.everyDays - b.everyDays || b.minutes - a.minutes);
+  for (const c of flexible) {
+    const owner = ownerOf(c, members);
+    const cap = capFor(owner);
+    const land = landFor(cap);
+    const load = owner ? loadOf(owner) : total;
     const p = Math.max(1, c.everyDays);
     const current = Math.min(p - 1, Math.max(0, daysUntil(c.nextDue, today)));
-    // The first date must be a day someone's around; later repeats get moved off free days as they come up.
+    // The first date must be a working day; later repeats get moved off days off as they come up.
     const starts = Array.from({ length: Math.min(p, HORIZON) }, (_, o) => o).filter((o) => cap(o));
     if (!starts.length) starts.push(land(0));
     let best = starts[0];
@@ -306,31 +359,34 @@ export function redistribute(
       let n = 0;
       for (let d = o; d < HORIZON; d += p, n++) {
         const x = d === o ? o : land(d);
-        const after = total[x] + c.minutes;
+        const after = load[x] + c.minutes;
         sum += after;
         over += Math.max(0, after - cap(x));
         if (x < NEAR) nearOver += Math.max(0, after - cap(x));
       }
       // Going over the limit in the next few weeks matters most, then over the year; then how busy its
       // first day and its days on average are; and a nudge to stay put avoids needless moves.
-      const score = nearOver * 1000 + (over / n) * 1000 + total[o] + sum / n - (o === current ? 0.5 : 0);
+      const score = nearOver * 1000 + (over / n) * 1000 + load[o] + sum / n - (o === current ? 0.5 : 0);
       if (score < bestScore) {
         bestScore = score;
         best = o;
       }
     }
-    for (let d = best; d < HORIZON; d += p) total[d === best ? d : land(d)] += c.minutes;
+    for (let d = best; d < HORIZON; d += p) place(owner, d === best ? d : land(d), c.minutes);
     offsets.set(c.id, best);
   }
 
+  // Fixed chores go to their owner; rotating ones to whoever has room that day, fixed ones counted.
   const weekly = new Map(members.map((m) => [m.id, 0]));
   const byDay = new Map<string, Map<string, number>>();
   const changes: Array<[string, Pick<Chore, 'nextDue' | 'assigneeId'>]> = [];
-  for (const c of [...active].sort((a, b) => weeklyMinutes(b) - weeklyMinutes(a))) {
+  for (const c of [...active].sort((a, b) => fixedFirst(a, b) || weeklyMinutes(b) - weeklyMinutes(a))) {
     const nextDue = pinned(c) ? c.nextDue : addDays(today, offsets.get(c.id)!);
     const day = byDay.get(nextDue) ?? new Map<string, number>();
     byDay.set(nextDue, day);
-    const assigneeId = pickAssignee(weekly, availableOn(members, nextDue), null, { day, minutes: c.minutes, limit: dailyLimit });
+    const assigneeId =
+      ownerOf(c, members) ??
+      pickAssignee(weekly, availableOn(members, nextDue), null, { day, minutes: c.minutes, limit: dailyLimit });
     if (assigneeId) {
       weekly.set(assigneeId, weekly.get(assigneeId)! + weeklyMinutes(c));
       day.set(assigneeId, (day.get(assigneeId) ?? 0) + c.minutes);
