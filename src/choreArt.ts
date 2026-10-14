@@ -54,7 +54,8 @@ export interface Avatar {
 /** The first is the default: the kid from coloring/doing. Others live in coloring/avatars/<id>/. */
 export const AVATARS: Avatar[] = [
   { id: 'kid', name: 'Kiddo' },
-  { id: 'wife', name: 'Curly' },
+  { id: 'curly', name: 'Curly' },
+  { id: 'buddy', name: 'Buddy' },
 ];
 export const DEFAULT_AVATAR = AVATARS[0].id;
 

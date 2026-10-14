@@ -182,6 +182,9 @@ export function ChoreList({
                       // Fixing a chore to someone hands it to them now; "Anyone" leaves the current turn as is.
                       onChange={(owner) => save(c.id, owner ? { owner, assigneeId: owner } : { owner: null })}
                     />
+                    {!c.owner && c.assigneeId && (
+                      <span className="unit">next: {members.find((m) => m.id === c.assigneeId)?.name}</span>
+                    )}
                     <input
                       type="date"
                       aria-label="Next due"
