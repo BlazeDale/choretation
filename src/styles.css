@@ -1,0 +1,363 @@
+:root {
+  --bg: #f6f5f1;
+  --surface: #ffffff;
+  --text: #1f2421;
+  --muted: #6b716d;
+  --border: #e2e0d8;
+  --brand: #2f855a;
+  --brand-soft: #e3f3ea;
+  --danger: #c0392b;
+  --overdue: #fdecea;
+  --radius: 10px;
+  color-scheme: light dark;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #161917;
+    --surface: #202421;
+    --text: #e8ebe9;
+    --muted: #9aa29d;
+    --border: #343a36;
+    --brand: #48b07c;
+    --brand-soft: #1e3328;
+    --danger: #ef6b5c;
+    --overdue: #3a2422;
+  }
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font: 15px/1.45 system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+}
+
+h1 { font-size: 1.4rem; margin: 0 0 12px; }
+h2 { font-size: 1.1rem; margin: 24px 0 10px; }
+h3 { font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); margin: 18px 0 6px; }
+
+button, input, select { font: inherit; color: inherit; }
+input, select {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  padding: 7px 9px;
+  min-width: 0;
+}
+button {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  padding: 7px 14px;
+  cursor: pointer;
+}
+button:hover:not(:disabled) { border-color: var(--brand); }
+button:disabled { opacity: 0.5; cursor: default; }
+button.primary { background: var(--brand); border-color: var(--brand); color: #fff; font-weight: 600; }
+button.link { background: none; border: none; color: var(--brand); padding: 4px 6px; }
+button.link.danger { color: var(--danger); }
+
+label { display: flex; flex-direction: column; gap: 4px; font-size: 0.9rem; color: var(--muted); }
+label.check { flex-direction: row; align-items: center; gap: 8px; color: var(--text); font-size: 1rem; }
+
+.page { max-width: 920px; margin: 0 auto; padding: 16px 16px 80px; }
+.center { min-height: 100vh; display: grid; place-items: center; padding: 16px; }
+.card-panel { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; margin-bottom: 14px; }
+.card-panel > label { margin-bottom: 12px; }
+.hint { color: var(--muted); font-size: 0.9rem; margin: 4px 0 12px; }
+.error { color: var(--danger); }
+.notice { background: var(--brand-soft); border-radius: var(--radius); padding: 10px 14px; }
+.empty { color: var(--muted); padding: 8px 0; }
+.summary { background: var(--brand-soft); border-radius: var(--radius); padding: 10px 14px; }
+.grow { flex: 1; min-width: 0; }
+.muted { opacity: 0.5; }
+
+.actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 14px; flex-wrap: wrap; }
+.actions.sticky { position: sticky; bottom: 0; background: var(--bg); padding: 12px 0; border-top: 1px solid var(--border); }
+.inline { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; flex-wrap: wrap; }
+.inline input { flex: 1; }
+
+.login { width: 100%; max-width: 380px; display: flex; flex-direction: column; gap: 12px; }
+
+/* Header + tabs */
+.top { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 8px; }
+.top h1 { margin: 0; }
+.tabs { display: flex; gap: 4px; background: var(--surface); border: 1px solid var(--border); border-radius: 999px; padding: 3px; overflow-x: auto; }
+.tabs button { border: none; border-radius: 999px; padding: 6px 12px; background: none; white-space: nowrap; }
+.tabs button.on { background: var(--brand); color: #fff; }
+
+/* Setup */
+.steps { display: flex; gap: 8px; list-style: none; padding: 0; margin: 0 0 16px; counter-reset: step; }
+.steps li { counter-increment: step; color: var(--muted); font-size: 0.9rem; }
+.steps li::before { content: counter(step) '. '; }
+.steps li.current { color: var(--brand); font-weight: 600; }
+.form-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 12px; }
+.toggles { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 8px; margin-top: 16px; }
+.room-row .room-name { flex: 1; min-width: 140px; }
+h4.level { margin: 12px 0 6px; font-size: 0.95rem; }
+.home-form .group { margin-bottom: 10px; }
+
+/* Lists */
+.rows { list-style: none; padding: 0; margin: 0; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); }
+.rows li { display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-top: 1px solid var(--border); flex-wrap: wrap; }
+.rows li:first-child { border-top: none; }
+.row-controls { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.minutes { width: 64px; }
+.unit { color: var(--muted); font-size: 0.85rem; margin-right: 4px; }
+
+.filters { display: flex; gap: 6px; flex-wrap: wrap; margin: 12px 0; }
+.chip { border-radius: 999px; padding: 5px 14px; }
+.chip.on { background: var(--brand); color: #fff; border-color: var(--brand); }
+.member { margin-bottom: 12px; }
+.member .inline { margin-bottom: 4px; }
+.free-days { display: flex; gap: 4px; align-items: center; flex-wrap: wrap; }
+.free-days .chip { padding: 3px 9px; font-size: 0.85rem; }
+
+.count { color: var(--muted); font-weight: 400; font-size: 0.9rem; margin-left: 6px; }
+.cards { list-style: none; padding: 0; margin: 0; display: grid; gap: 8px; }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px 14px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+.card.overdue { background: var(--overdue); }
+.card-main { flex: 1; min-width: 200px; }
+.card-title { font-weight: 600; }
+.meta { color: var(--muted); font-size: 0.85rem; }
+.card.overdue .due { color: var(--danger); font-weight: 600; }
+.card-actions { display: flex; gap: 6px; align-items: center; }
+
+.loads { display: flex; gap: 8px; flex-wrap: wrap; margin: 12px 0; }
+.load { background: var(--surface); border: 1px solid var(--border); border-radius: 999px; padding: 4px 12px; font-size: 0.9rem; }
+.add-btn { width: 100%; border-style: dashed; margin-bottom: 8px; }
+.add-form { display: flex; flex-direction: column; gap: 8px; }
+.rows li.editing { display: block; padding: 6px; }
+.rows li.editing .add-form { margin: 0; }
+.history .meta { white-space: nowrap; }
+
+/* ---------- Chores tab: colored-in calendar ----------
+   The printed page, colored in: every person has a crayon, and each day's picture sits on a
+   scribbled patch of the crayon belonging to whoever does that day's biggest chore. */
+.view-switch { display: inline-flex; gap: 2px; background: var(--surface); border: 1px solid var(--border); border-radius: 999px; padding: 3px; margin-bottom: 12px; }
+.view-switch button { border: none; border-radius: 999px; padding: 5px 16px; background: none; }
+.view-switch button.on { background: var(--brand); color: #fff; }
+
+.ccal { --ink: #1d1d1f; font-family: 'Patrick Hand', 'Comic Sans MS', cursive; }
+.ccal-bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 16px; margin-bottom: 12px; }
+.ccal-month { display: flex; align-items: center; gap: 6px; }
+.ccal-month h2 { font-family: 'Fredoka', system-ui, sans-serif; font-weight: 600; font-size: 1.7rem; margin: 0; min-width: 9.5ch; text-align: center; letter-spacing: 0.01em; }
+.ccal-month h2 span { font-weight: 400; color: var(--muted); }
+.ccal-arrow { font-family: 'Fredoka', system-ui, sans-serif; font-size: 1.4rem; line-height: 1; width: 36px; height: 36px; padding: 0; border-radius: 50%; }
+.ccal-people { display: flex; flex-wrap: wrap; gap: 6px; }
+.ccal-person { font-family: inherit; font-size: 1.05rem; display: inline-flex; align-items: center; gap: 6px; border-radius: 999px; padding: 3px 12px; }
+.ccal-person.on { border-color: var(--c, var(--brand)); box-shadow: inset 0 0 0 1.5px var(--c, var(--brand)); }
+
+/* A crayon dot: slightly lopsided so it reads as drawn, not stamped. */
+.ccal-dot { flex: none; width: 0.62em; height: 0.62em; background: var(--c); border-radius: 55% 45% 50% 50% / 45% 55% 45% 55%; }
+
+.ccal-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 5px; }
+.ccal-dow { font-family: 'Fredoka', system-ui, sans-serif; font-size: 0.85rem; color: var(--muted); text-align: center; padding-bottom: 2px; }
+.ccal-cell {
+  position: relative;
+  min-width: 0;
+  min-height: 132px;
+  padding: 4px 6px 6px;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 2px;
+  text-align: left;
+  font-family: inherit;
+  color: var(--text);
+  background: var(--surface);
+  border: 1.5px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+}
+.ccal-cell:hover:not(:disabled) { border-color: var(--text); }
+.ccal-cell:focus-visible { outline: 2.5px solid var(--brand); outline-offset: 2px; }
+.ccal-cell.blank { background: none; border-style: dashed; }
+.ccal-cell.past { opacity: 0.45; cursor: default; }
+.ccal-cell.picked { border-color: var(--text); box-shadow: 0 0 0 1.5px var(--text); }
+.ccal-num { font-family: 'Fredoka', system-ui, sans-serif; font-weight: 600; font-size: 1.05rem; line-height: 1; align-self: flex-start; padding: 3px 5px; }
+/* Who has the day off: an uncolored ring in their crayon. */
+.ccal-offs { position: absolute; top: 9px; left: 32px; display: flex; gap: 2px; }
+.ccal-ring { width: 0.62em; height: 0.62em; border: 1.5px solid var(--c); border-radius: 50%; }
+/* Today gets a hand-drawn ring. */
+.ccal-cell.today .ccal-num { border: 2px solid var(--brand); border-radius: 52% 48% 45% 55% / 55% 45% 55% 45%; transform: rotate(-6deg); }
+
+/* --c comes from the cell or day-list row (the crayon of whoever does the chore). */
+.ccal-patch {
+  position: absolute;
+  top: 4px;
+  right: 5px;
+  width: 52px;
+  height: 52px;
+  border-radius: 58% 42% 55% 45% / 45% 55% 42% 58%;
+  background:
+    repeating-linear-gradient(-38deg, color-mix(in srgb, var(--c) 55%, transparent) 0 2px, transparent 2px 5px),
+    color-mix(in srgb, var(--c) 32%, #fff);
+}
+.ccal-patch .art-img { width: 100%; height: 100%; mix-blend-mode: multiply; }
+.ccal-patch.small { position: static; width: 44px; height: 44px; flex: none; }
+
+.ccal-lines { list-style: none; margin: 34px 0 0; padding: 0; display: flex; flex-direction: column; gap: 1px; font-size: 0.92rem; line-height: 1.12; min-width: 0; }
+.ccal-lines li { display: flex; align-items: center; gap: 4px; min-width: 0; }
+.ccal-name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ccal-more { color: var(--muted); padding-left: 1em; }
+.ccal-dots { display: none; flex-wrap: wrap; gap: 3px; margin-top: auto; }
+.ccal-free { margin-top: auto; color: var(--muted); font-size: 0.95rem; }
+.ccal .loc img { width: 1.05em; height: 1.05em; }
+
+.ccal-day { margin-top: 14px; background: var(--surface); border: 1.5px solid var(--text); border-radius: 14px; padding: 12px 14px; animation: ccal-open 160ms ease-out; }
+.ccal-day header { display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: 4px 12px; margin-bottom: 6px; }
+.ccal-day h3 { font-family: 'Fredoka', system-ui, sans-serif; text-transform: none; letter-spacing: 0; color: var(--text); font-size: 1.15rem; margin: 0; }
+.ccal-day ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.ccal-day li { display: flex; align-items: center; gap: 10px; }
+.ccal-day-main { flex: 1; min-width: 0; display: flex; flex-direction: column; font-size: 1.1rem; line-height: 1.15; }
+.ccal-day-main strong { font-weight: 400; }
+.ccal-day-main .meta { font-family: system-ui, sans-serif; display: flex; align-items: center; gap: 4px; }
+.ccal-who { display: inline-flex; align-items: center; gap: 6px; font-size: 1.05rem; white-space: nowrap; }
+@keyframes ccal-open { from { opacity: 0; transform: translateY(-4px); } }
+@media (prefers-reduced-motion: reduce) { .ccal-day { animation: none; } }
+
+/* Line drawings are black on white: keep them on light patches, and flip the small place icons in the dark. */
+@media (prefers-color-scheme: dark) {
+  .ccal .loc img { filter: invert(1); mix-blend-mode: screen; }
+}
+
+/* Phones: cells become the number, the picture and a row of crayon dots; tap a day for the list. */
+@media (max-width: 700px) {
+  .ccal-grid { gap: 3px; }
+  .ccal-cell { min-height: 74px; padding: 3px; align-items: center; border-radius: 9px; }
+  .ccal-num { align-self: flex-start; font-size: 0.9rem; padding: 2px 3px; }
+  .ccal-offs { top: 6px; left: auto; right: 4px; }
+  .ccal-patch { position: static; width: 36px; height: 36px; margin-top: -4px; }
+  .ccal-lines { display: none; }
+  .ccal-dots { display: flex; justify-content: center; font-size: 0.85rem; }
+  .ccal-free { font-size: 0.8rem; }
+  .ccal-person { font-size: 0.95rem; padding: 2px 10px; }
+  .ccal-day li { flex-wrap: wrap; }
+  .ccal-who { margin-left: 54px; }
+}
+
+/* ---------- Printable chore calendar ----------
+   A coloring page: black outlines only, no ink fills, so it can be colored in any way. */
+.print-controls { display: flex; flex-direction: column; gap: 10px; align-items: flex-start; }
+.sheets { display: grid; gap: 24px; }
+.sheet-scroll { overflow-x: auto; }
+
+.sheet {
+  --ink: #000;
+  /* Same proportions as a printed landscape page, so cells that fit here fit on paper. */
+  width: 1000px;
+  height: 700px; /* 186mm, the printed height */
+  background: #fff;
+  color: var(--ink);
+  border-radius: 14px;
+  box-shadow: 0 4px 24px rgb(0 0 0 / 0.12);
+  padding: 22px 26px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  position: relative;
+  overflow: hidden;
+  font-family: 'Patrick Hand', 'Comic Sans MS', cursive;
+}
+.sheet::before {
+  content: '';
+  position: absolute;
+  inset: 8px;
+  border: 2px dashed var(--ink);
+  border-radius: 10px;
+  pointer-events: none;
+}
+/* Hollow letters to color in. Outlined with shadows rather than text-stroke, which would also trace
+   where the font's letter pieces overlap (the bowl and stem of a "d"). --o is the outline width. */
+.hollow {
+  --o: 1.3px;
+  color: #fff;
+  font-family: 'Fredoka', system-ui, sans-serif;
+  font-weight: 700;
+  text-shadow: calc(1.000 * var(--o)) calc(0.000 * var(--o)) 0 var(--ink), calc(0.924 * var(--o)) calc(0.383 * var(--o)) 0 var(--ink), calc(0.707 * var(--o)) calc(0.707 * var(--o)) 0 var(--ink), calc(0.383 * var(--o)) calc(0.924 * var(--o)) 0 var(--ink), calc(0.000 * var(--o)) calc(1.000 * var(--o)) 0 var(--ink), calc(-0.383 * var(--o)) calc(0.924 * var(--o)) 0 var(--ink), calc(-0.707 * var(--o)) calc(0.707 * var(--o)) 0 var(--ink), calc(-0.924 * var(--o)) calc(0.383 * var(--o)) 0 var(--ink), calc(-1.000 * var(--o)) calc(0.000 * var(--o)) 0 var(--ink), calc(-0.924 * var(--o)) calc(-0.383 * var(--o)) 0 var(--ink), calc(-0.707 * var(--o)) calc(-0.707 * var(--o)) 0 var(--ink), calc(-0.383 * var(--o)) calc(-0.924 * var(--o)) 0 var(--ink), calc(-0.000 * var(--o)) calc(-1.000 * var(--o)) 0 var(--ink), calc(0.383 * var(--o)) calc(-0.924 * var(--o)) 0 var(--ink), calc(0.707 * var(--o)) calc(-0.707 * var(--o)) 0 var(--ink), calc(0.924 * var(--o)) calc(-0.383 * var(--o)) 0 var(--ink);
+}
+
+.sheet-head { position: relative; display: flex; justify-content: space-between; align-items: flex-end; min-height: 78px; flex: none; }
+.banner { position: absolute; inset: -4px 160px -4px 400px; width: calc(100% - 560px); height: calc(100% + 8px); object-fit: contain; pointer-events: none; }
+.doodles { position: absolute; inset: -6px -10px 0; width: calc(100% + 20px); height: 100%; pointer-events: none; }
+.doodles path, .doodles circle { fill: none; stroke: var(--ink); stroke-width: 1.5; }
+
+.sheet-title { position: relative; display: flex; flex-direction: column; line-height: 0.95; }
+.sheet-name { font-size: 28px; transform: rotate(-3deg); transform-origin: left; }
+.sheet-sub { --o: 2px; font-size: 52px; letter-spacing: 1.5px; }
+.sheet-month {
+  position: relative;
+  border: 2.5px solid var(--ink);
+  padding: 6px 18px 4px;
+  border-radius: 14px 14px 14px 4px;
+  transform: rotate(2deg);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.sheet-month span:first-child { --o: 1.6px; font-size: 32px; line-height: 1; letter-spacing: 0.5px; }
+.sheet-year { font-size: 16px; letter-spacing: 2px; }
+
+/* Calendar */
+.cal { flex: 1; min-height: 0; display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+.cal-dow { --o: 1px; font-size: 17px; letter-spacing: 0.5px; text-align: center; border: 2px solid var(--ink); border-radius: 8px 8px 3px 3px; padding: 0 0 1px; }
+.cal-cell { position: relative; min-height: 0; overflow: hidden; contain: size; border: 2px solid var(--ink); border-radius: 10px; padding: 2px 4px 3px; display: flex; flex-direction: column; }
+.cal-cell.out { border-style: dashed; border-width: 1.5px; }
+.cal-cell.past { opacity: 0.3; }
+.cal-num { --o: 1.1px; position: absolute; top: 2px; left: 5px; font-size: 19px; line-height: 1; }
+/* The picture takes whatever height the chore list leaves, so the list sits at the bottom. */
+.cal-pic { flex: 1 1 0; min-height: 44px; display: flex; justify-content: center; padding: 2px 0 1px; }
+.cal-pic .art-img { width: 100%; height: 100%; }
+/* At the smallest text size, the picture gives way rather than spilling out of the cell. */
+.cal-cell.lvl-3 .cal-pic { min-height: 0; }
+.cal-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 1px; min-height: 0; }
+.cal-list li { display: flex; align-items: center; gap: 3px; line-height: 1.1; }
+.cal-list li span:last-child { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.cal-list.roomy li { font-size: 12.5px; }
+.cal-list.snug li { font-size: 11px; }
+.cal-list.one-line li span:last-child { -webkit-line-clamp: 1; }
+.cal-list.tight li { font-size: 9.5px; }
+.cal-free { margin: auto; font-size: 18px; transform: rotate(-4deg); }
+
+.loc { flex: none; display: inline-flex; align-items: flex-end; }
+.loc img { width: 1.1em; height: 1.1em; object-fit: contain; mix-blend-mode: multiply; }
+/* Until outline drawings exist, emoji stand in, greyed so they read as uncolored. */
+.loc-emoji { font-size: 0.9em; font-family: 'Segoe UI Emoji', 'Apple Color Emoji', 'Noto Color Emoji', sans-serif; filter: grayscale(1) contrast(1.2); }
+.loc sub { font-family: 'Fredoka', system-ui, sans-serif; font-size: 0.75em; font-weight: 600; line-height: 1; margin-left: -1px; }
+.legend { flex: none; display: flex; flex-wrap: wrap; align-items: center; gap: 2px 12px; font-size: 12px; line-height: 1.2; }
+.legend strong { font-family: 'Fredoka', system-ui, sans-serif; }
+.legend-item { white-space: nowrap; display: inline-flex; align-items: center; gap: 3px; }
+.art-img { display: block; object-fit: contain; mix-blend-mode: multiply; }
+
+.sheet-foot { flex: none; display: flex; align-items: flex-end; justify-content: space-between; gap: 18px; font-size: 15px; }
+.reward { display: flex; align-items: flex-end; gap: 8px; flex: 1; max-width: 460px; }
+.reward .line { flex: 1; border-bottom: 2px dashed var(--ink); height: 1.2em; }
+.cheer { font-size: 18px; transform: rotate(-1.5deg); }
+
+@media print {
+  @page { size: landscape; margin: 7mm; }
+  body { background: #fff; }
+  .no-print { display: none !important; }
+  .page { max-width: none; padding: 0; margin: 0; }
+  .sheets { display: block; }
+  .sheet-scroll { overflow: visible; }
+  .sheet {
+    min-width: 0;
+    width: 100%;
+    /* One landscape page on A4 or Letter, with room to spare for browser headers/footers. A fixed size
+       rather than 100vh, which some browsers measure from the screen and then spill onto a second page. */
+    height: 186mm;
+    break-inside: avoid;
+    padding: 14px 18px 12px;
+    box-shadow: none;
+    border-radius: 0;
+    break-after: page;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  .sheet-scroll:last-child .sheet { break-after: auto; }
+}
