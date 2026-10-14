@@ -1,3 +1,4 @@
+/* First-paint defaults; themes.ts sets the chosen theme's colors on <html>. */
 :root {
   --bg: #f6f5f1;
   --surface: #ffffff;
@@ -5,6 +6,7 @@
   --muted: #6b716d;
   --border: #e2e0d8;
   --brand: #2f855a;
+  --on-brand: #ffffff;
   --brand-soft: #e3f3ea;
   --danger: #c0392b;
   --overdue: #fdecea;
@@ -20,6 +22,7 @@
     --muted: #9aa29d;
     --border: #343a36;
     --brand: #48b07c;
+    --on-brand: #0c1a12;
     --brand-soft: #1e3328;
     --danger: #ef6b5c;
     --overdue: #3a2422;
@@ -56,7 +59,7 @@ button {
 }
 button:hover:not(:disabled) { border-color: var(--brand); }
 button:disabled { opacity: 0.5; cursor: default; }
-button.primary { background: var(--brand); border-color: var(--brand); color: #fff; font-weight: 600; }
+button.primary { background: var(--brand); border-color: var(--brand); color: var(--on-brand); font-weight: 600; }
 button.link { background: none; border: none; color: var(--brand); padding: 4px 6px; }
 button.link.danger { color: var(--danger); }
 
@@ -87,7 +90,7 @@ label.check { flex-direction: row; align-items: center; gap: 8px; color: var(--t
 .top h1 { margin: 0; }
 .tabs { display: flex; gap: 4px; background: var(--surface); border: 1px solid var(--border); border-radius: 999px; padding: 3px; overflow-x: auto; }
 .tabs button { border: none; border-radius: 999px; padding: 6px 12px; background: none; white-space: nowrap; }
-.tabs button.on { background: var(--brand); color: #fff; }
+.tabs button.on { background: var(--brand); color: var(--on-brand); }
 
 /* Setup */
 .steps { display: flex; gap: 8px; list-style: none; padding: 0; margin: 0 0 16px; counter-reset: step; }
@@ -110,7 +113,7 @@ h4.level { margin: 12px 0 6px; font-size: 0.95rem; }
 
 .filters { display: flex; gap: 6px; flex-wrap: wrap; margin: 12px 0; }
 .chip { border-radius: 999px; padding: 5px 14px; }
-.chip.on { background: var(--brand); color: #fff; border-color: var(--brand); }
+.chip.on { background: var(--brand); color: var(--on-brand); border-color: var(--brand); }
 .member { margin-bottom: 12px; }
 .member .inline { margin-bottom: 4px; }
 .free-days { display: flex; gap: 4px; align-items: center; flex-wrap: wrap; }
@@ -137,9 +140,21 @@ h4.level { margin: 12px 0 6px; font-size: 0.95rem; }
 /* ---------- Chores tab: colored-in calendar ----------
    The printed page, colored in: every person has a crayon, and each day's picture sits on a
    scribbled patch of the crayon belonging to whoever does that day's biggest chore. */
+/* Theme picker */
+.themes { display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 10px; }
+.theme { display: flex; flex-direction: column; align-items: stretch; gap: 6px; padding: 6px 6px 8px; font-size: 0.9rem; text-align: center; border-radius: 12px; }
+.theme[aria-pressed='true'] { border-color: var(--brand); box-shadow: 0 0 0 2px var(--brand); font-weight: 600; }
+.swatch-pair { display: flex; gap: 4px; }
+.swatch-pair .swatch { flex: 1; }
+.swatch { display: flex; align-items: center; justify-content: center; height: 58px; border: 1px solid; border-radius: 8px; padding: 8px; }
+.swatch-card { width: 100%; height: 100%; border: 1px solid; border-radius: 5px; padding: 5px 6px; display: flex; flex-direction: column; gap: 3px; }
+.swatch-line { height: 3px; border-radius: 2px; width: 80%; }
+.swatch-line.short { width: 50%; }
+.swatch-pill { margin-top: auto; height: 8px; width: 46%; border-radius: 999px; }
+
 .view-switch { display: inline-flex; gap: 2px; background: var(--surface); border: 1px solid var(--border); border-radius: 999px; padding: 3px; margin-bottom: 12px; }
 .view-switch button { border: none; border-radius: 999px; padding: 5px 16px; background: none; }
-.view-switch button.on { background: var(--brand); color: #fff; }
+.view-switch button.on { background: var(--brand); color: var(--on-brand); }
 
 .ccal { --ink: #1d1d1f; font-family: 'Patrick Hand', 'Comic Sans MS', cursive; }
 .ccal-bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 16px; margin-bottom: 12px; }
@@ -221,9 +236,7 @@ h4.level { margin: 12px 0 6px; font-size: 0.95rem; }
 @media (prefers-reduced-motion: reduce) { .ccal-day { animation: none; } }
 
 /* Line drawings are black on white: keep them on light patches, and flip the small place icons in the dark. */
-@media (prefers-color-scheme: dark) {
-  .ccal .loc img { filter: invert(1); mix-blend-mode: screen; }
-}
+:root[data-mode='dark'] .ccal .loc img { filter: invert(1); mix-blend-mode: screen; }
 
 /* Phones: cells become the number, the picture and a row of crayon dots; tap a day for the list. */
 @media (max-width: 700px) {

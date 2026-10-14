@@ -18,6 +18,7 @@ import type { Chore, HomeConfig, Household, Member } from '../types';
 import { ChorePicker } from './ChorePicker';
 import { HomeForm } from './HomeForm';
 import { RedistributeButton } from './Redistribute';
+import { ThemePicker } from './ThemePicker';
 
 export function Settings({ uid, household, chores }: { uid: string; household: Household; chores: Chore[] }) {
   const { members } = household;
@@ -94,6 +95,12 @@ export function Settings({ uid, household, chores }: { uid: string; household: H
             onBlur={(e) => e.target.value.trim() && fireAndForget(saveHousehold(uid, { name: e.target.value.trim() }))}
           />
         </label>
+      </section>
+
+      <section className="card-panel">
+        <h2>Theme</h2>
+        <p className="hint">Saved on this device, so everyone can pick their own. Printed calendars stay black and white.</p>
+        <ThemePicker />
       </section>
 
       <section className="card-panel">
