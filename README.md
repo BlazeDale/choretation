@@ -56,4 +56,4 @@ households/{uid}/chores/{id}  key, area, name, minutes, everyDays, assigneeId, n
 households/{uid}/history/{id} choreId, choreName, memberId, minutes, date, at
 ```
 
-Security rules (`firestore.rules`) only let the signed-in household account read and write its own data.
+Security rules (`firestore.rules`) only let the signed-in household account read and write its own data. See [SECURITY.md](SECURITY.md) for what is protected and the remaining owner checklist.
