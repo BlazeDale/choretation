@@ -6,6 +6,7 @@ import { memberLoads, nextWeekday, scheduleNew, todayStr, weekdayOf } from '../r
 import type { Chore, ChoreDraft, Member, NewChore, Room } from '../types';
 import { FrequencySelect, MinutesInput, OwnerSelect, WeekdaySelect } from './inputs';
 import { ChoreCalendar } from './ChoreCalendar';
+import { EVERYONE, PersonFilter, isTheirs, usePersonFilter } from './PersonFilter';
 import { RedistributeButton } from './Redistribute';
 
 type View = 'list' | 'calendar';
@@ -55,11 +56,15 @@ export function ChoreList({
   const [changed, setChanged] = useState<string | null>(null);
   const save = (id: string, patch: Partial<NewChore>) => fireAndForget(updateChore(uid, id, patch));
 
+  const [who, setWho] = usePersonFilter(members);
+  const allAreas = useMemo(() => [...new Set(chores.map((c) => c.area))].sort(), [chores]);
   const groups = useMemo(() => {
     const m = new Map<string, Chore[]>();
-    for (const c of [...chores].sort((a, b) => a.name.localeCompare(b.name))) m.set(c.area, [...(m.get(c.area) ?? []), c]);
+    const shown = chores.filter((c) => isTheirs(c, who)).sort((a, b) => a.name.localeCompare(b.name));
+    for (const c of shown) m.set(c.area, [...(m.get(c.area) ?? []), c]);
     return [...m.entries()].sort((a, b) => a[0].localeCompare(b[0]));
-  }, [chores]);
+  }, [chores, who]);
+  const whoName = members.find((m) => m.id === who)?.name;
 
   const loads = memberLoads(chores, members);
 
@@ -113,7 +118,7 @@ export function ChoreList({
       )}
 
       <AddChore
-        areas={groups.map(([a]) => a)}
+        areas={allAreas}
         onAdd={(draft) => {
           fireAndForget(addChores(uid, scheduleNew([draft], chores, members)));
           setChanged(`Added "${draft.name}".`);
@@ -128,6 +133,14 @@ export function ChoreList({
         </div>
       )}
 
+      <PersonFilter members={members} value={who} onChange={setWho} />
+      {who !== EVERYONE && (
+        <p className="hint">
+          {groups.reduce((n, [, items]) => n + items.length, 0)} chores: always {whoName}'s, plus rotating ones where it's{' '}
+          {whoName}'s turn.
+        </p>
+      )}
+      {!groups.length && <p className="empty">Nothing on {whoName}'s list right now.</p>}
       {groups.map(([area, items]) => (
         <section key={area} className="group">
           <h3>{area}</h3>
@@ -136,7 +149,7 @@ export function ChoreList({
               editing === c.id ? (
                 <li key={c.id} ref={editRef} className="editing">
                   <ChoreForm
-                    areas={groups.map(([a]) => a)}
+                    areas={allAreas}
                     initial={c}
                     submitLabel="Save changes"
                     onCancel={() => setEditing(null)}
