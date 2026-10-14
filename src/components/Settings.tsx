@@ -13,6 +13,7 @@ import {
   pickAssignee,
   rebalance,
   scheduleNew,
+  weeklyMinutes,
 } from '../rotation';
 import type { Chore, HomeConfig, Household, Member } from '../types';
 import { ChorePicker } from './ChorePicker';
@@ -41,7 +42,7 @@ export function Settings({ uid, household, chores }: { uid: string; household: H
     // Their chores (including ones that were always theirs) go back into the rotation.
     for (const c of chores.filter((c) => c.assigneeId === m.id || c.owner === m.id)) {
       const id = pickAssignee(load, availableOn(remaining, c.nextDue));
-      if (id) load.set(id, load.get(id)! + (c.minutes * 7) / c.everyDays);
+      if (id) load.set(id, load.get(id)! + weeklyMinutes(c));
       patches.push([c.id, c.owner === m.id ? { assigneeId: id, owner: null } : { assigneeId: id }]);
     }
     setMembers(remaining);

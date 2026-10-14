@@ -41,3 +41,28 @@ it('spreads her real chores across working days after redistributing', () => {
   // Her limit is 60; only a single chore longer than that (the 75-minute deep clean) may exceed it.
   expect(Math.max(...loads.values())).toBeLessThanOrEqual(75);
 });
+
+it('shares a big daily chore instead of letting it starve its holder of everything else', () => {
+  // The same household later: two more people and a 2-hour daily chore (14 hours a week).
+  const ROWS2: Array<[number, number, number | null, string]> = [
+    [25, 90, null, '01-01'], [30, 14, null, '10-26'], [120, 1, null, '10-14'], [15, 14, null, '10-16'], [25, 90, null, '11-01'],
+    [15, 14, null, '10-19'], [30, 7, null, '10-15'], [30, 30, null, '10-23'], [75, 90, null, '12-18'], [10, 7, 2, '10-20'],
+    [10, 14, 1, '10-19'], [20, 30, null, '11-06'], [15, 60, null, '12-08'], [5, 14, null, '10-20'], [20, 7, null, '10-18'],
+    [20, 30, null, '10-15'], [10, 14, 1, '10-26'], [20, 7, null, '10-16'], [20, 60, null, '11-20'], [20, 30, null, '10-27'],
+    [15, 7, null, '10-18'], [10, 7, null, '10-16'], [20, 30, null, '10-29'], [20, 30, null, '11-10'], [20, 7, null, '10-19'],
+    [10, 90, null, '11-08'], [20, 60, null, '12-04'], [20, 7, null, '10-20'], [15, 30, null, '11-12'], [15, 30, null, '10-25'],
+  ];
+  const three: Member[] = [members[0], { id: 'v', name: 'Second' }, { id: 'p', name: 'Third' }];
+  const all: Chore[] = ROWS2.map(([minutes, everyDays, weekday, due], i) => ({
+    id: String(i), key: '', area: 'x', name: `chore ${i}`, minutes, everyDays, weekday,
+    nextDue: `${due.startsWith('01') ? 2027 : 2026}-${due}`, assigneeId: i === 2 ? 'p' : 'c', lastDone: null, lastDoneBy: null, active: true,
+  }));
+  const moved = new Map(redistribute(all, three, 60, today));
+  const count = new Map<string, number>();
+  for (const c of all) {
+    const a = moved.get(c.id)?.assigneeId ?? c.assigneeId!;
+    count.set(a, (count.get(a) ?? 0) + 1);
+  }
+  // It used to go 15 / 14 / 1; everyone should now get a fair handful.
+  for (const m of three) expect(count.get(m.id) ?? 0).toBeGreaterThanOrEqual(7);
+});

@@ -1,5 +1,5 @@
 import { useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { artKey } from '../choreArt';
+import { DEFAULT_AVATAR, artKey } from '../choreArt';
 import { compactName, locationsFor, type Location } from '../locations';
 import { ArtImg, LocationMark } from './Art';
 import { projectMonth, todayStr } from '../rotation';
@@ -132,7 +132,7 @@ export function PrintMonth({
               <div className="sheet-scroll" key={m.id}>
                 <section className="sheet">
                   <header className="sheet-head">
-                    <Banner key={month0} month0={month0} />
+                    <Banner key={`${month0}-${m.avatar ?? ''}`} month0={month0} avatar={m.avatar} />
                     <div className="sheet-title">
                       <span className="sheet-name hollow">{m.name}'s</span>
                       <span className="sheet-sub hollow">Chore Calendar</span>
@@ -257,10 +257,12 @@ function DayCell({
   );
 }
 
-/** The month's seasonal coloring banner, then the everyday one, then drawn doodles. */
-function Banner({ month0 }: { month0: number }) {
+/** The month's seasonal scene with the person's avatar, then with the kid, then the everyday banner, then doodles. */
+function Banner({ month0, avatar }: { month0: number; avatar?: string }) {
   const base = `${import.meta.env.BASE_URL}coloring`;
-  const urls = [`${base}/months/${String(month0 + 1).padStart(2, '0')}.png`, `${base}/banner.png`];
+  const month = `months/${String(month0 + 1).padStart(2, '0')}.png`;
+  const urls = [`${base}/${month}`, `${base}/banner.png`];
+  if (avatar && avatar !== DEFAULT_AVATAR) urls.unshift(`${base}/avatars/${avatar}/${month}`);
   const [tries, setTries] = useState(0);
   if (tries >= urls.length) return <Doodles />;
   return <img key={urls[tries]} className="banner" src={urls[tries]} alt="" onError={() => setTries((t) => t + 1)} />;

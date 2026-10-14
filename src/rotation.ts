@@ -62,14 +62,33 @@ export function daysUntil(date: string, today = todayStr()): number {
 /** Average minutes per week a chore costs. This is what gets balanced across people. */
 export const weeklyMinutes = (c: Pick<ChoreDraft, 'minutes' | 'everyDays'>) => (c.minutes * 7) / c.everyDays;
 
-type Assignable = Pick<Chore, 'assigneeId' | 'minutes' | 'everyDays' | 'active'>;
+type Assignable = Pick<Chore, 'assigneeId' | 'minutes' | 'everyDays' | 'active'> & Partial<Pick<Chore, 'owner'>>;
+
+/**
+ * A rotating chore that comes round more than once a week is passed on every time it's done, so over
+ * a week everyone does their share of it. Counting it all against whoever has it today would make
+ * them look swamped (a 2-hour daily chore is 14 hours a week) and starve them of everything else.
+ */
+const isShared = (c: Pick<Chore, 'everyDays'> & Partial<Pick<Chore, 'owner'>>) => !c.owner && c.everyDays < 7;
+
+/** Adds a chore's weekly minutes to whoever carries it: its assignee, or everyone equally if it's shared. */
+function addLoad(
+  load: Map<string, number>,
+  c: Pick<Chore, 'minutes' | 'everyDays'> & Partial<Pick<Chore, 'owner'>>,
+  assigneeId: string | null,
+) {
+  const w = weeklyMinutes(c);
+  if (isShared(c)) {
+    for (const [id, l] of load) load.set(id, l + w / load.size);
+  } else if (assigneeId && load.has(assigneeId)) {
+    load.set(assigneeId, load.get(assigneeId)! + w);
+  }
+}
 
 export function memberLoads(chores: Assignable[], members: Member[]): Map<string, number> {
   const load = new Map(members.map((m) => [m.id, 0]));
   for (const c of chores) {
-    if (c.active && c.assigneeId && load.has(c.assigneeId)) {
-      load.set(c.assigneeId, load.get(c.assigneeId)! + weeklyMinutes(c));
-    }
+    if (c.active) addLoad(load, c, c.assigneeId);
   }
   return load;
 }
@@ -136,7 +155,7 @@ export function scheduleNew(drafts: ChoreDraft[], existing: Chore[], members: Me
     const offset = d.everyDays > 1 ? Math.floor(((i * GOLDEN) % 1) * d.everyDays) : 0;
     const nextDue = pinned(d) ? nextWeekday(today, d.weekday!) : nextWorkingDay(members, addDays(today, offset));
     const assigneeId = pickAssignee(load, availableOn(members, nextDue));
-    if (assigneeId) load.set(assigneeId, (load.get(assigneeId) ?? 0) + weeklyMinutes(d));
+    addLoad(load, d, assigneeId);
     result[i] = { ...d, weekday: d.weekday ?? null, assigneeId, nextDue, lastDone: null, lastDoneBy: null, active: true };
   }
   return result;
@@ -272,7 +291,7 @@ export function rebalance(all: Chore[], members: Member[]): Array<[string, strin
     .sort((a, b) => Number(!!ownerOf(b, members)) - Number(!!ownerOf(a, members)) || weeklyMinutes(b) - weeklyMinutes(a));
   for (const c of active) {
     const id = ownerOf(c, members) ?? pickAssignee(load, availableOn(members, c.nextDue));
-    if (id) load.set(id, load.get(id)! + weeklyMinutes(c));
+    addLoad(load, c, id);
     if (id !== c.assigneeId) changes.push([c.id, id]);
   }
   return changes;
@@ -387,10 +406,8 @@ export function redistribute(
     const assigneeId =
       ownerOf(c, members) ??
       pickAssignee(weekly, availableOn(members, nextDue), null, { day, minutes: c.minutes, limit: dailyLimit });
-    if (assigneeId) {
-      weekly.set(assigneeId, weekly.get(assigneeId)! + weeklyMinutes(c));
-      day.set(assigneeId, (day.get(assigneeId) ?? 0) + c.minutes);
-    }
+    addLoad(weekly, c, assigneeId);
+    if (assigneeId) day.set(assigneeId, (day.get(assigneeId) ?? 0) + c.minutes);
     if (nextDue !== c.nextDue || assigneeId !== c.assigneeId) changes.push([c.id, { nextDue, assigneeId }]);
   }
   return changes;
