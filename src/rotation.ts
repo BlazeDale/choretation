@@ -412,3 +412,32 @@ export function redistribute(
   }
   return changes;
 }
+
+/** Chores that come round this rarely (quarterly or less often) get a heads-up before they're due. */
+export const BIG_EVERY_DAYS = 90;
+export const HEADS_UP_DAYS = 7;
+
+/**
+ * Heads-ups that fall in a month: a week before each rare chore is due, for whoever will do it. Looks
+ * into next month too, so a chore due on the 3rd gets its heads-up on the 27th. Past days are skipped.
+ */
+export function headsUps(
+  chores: Chore[],
+  members: Member[],
+  year: number,
+  month0: number,
+  today = todayStr(),
+  dailyLimit = DEFAULT_DAILY_LIMIT,
+): Occurrence[] {
+  const big = new Set(chores.filter((c) => c.active && c.everyDays >= BIG_EVERY_DAYS).map((c) => c.id));
+  if (!big.size) return [];
+  const { first, last } = monthBounds(year, month0);
+  const next = new Date(year, month0 + 1, 1);
+  return [
+    ...projectMonth(chores, members, year, month0, today, dailyLimit),
+    ...projectMonth(chores, members, next.getFullYear(), next.getMonth(), today, dailyLimit),
+  ]
+    .filter((o) => big.has(o.choreId))
+    .map((o) => ({ ...o, date: addDays(o.date, -HEADS_UP_DAYS) }))
+    .filter((o) => o.date >= first && o.date <= last && o.date >= today);
+}

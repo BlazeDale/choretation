@@ -2,7 +2,7 @@ import { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { DEFAULT_AVATAR, artKey } from '../choreArt';
 import { compactName, locationsFor, type Location } from '../locations';
 import { ArtImg, LocationMark } from './Art';
-import { projectMonth, todayStr } from '../rotation';
+import { headsUps, projectMonth, todayStr } from '../rotation';
 import type { Chore, Member, Room } from '../types';
 
 const DOW = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -54,6 +54,20 @@ export function PrintMonth({
     const byId = new Map(chores.map((c) => [c.id, c]));
     const result = new Map<string, Map<number, Chore[]>>();
     for (const o of projectMonth(chores, members, year, month0, today, dailyLimit)) {
+      if (!o.memberId) continue;
+      const days = result.get(o.memberId) ?? new Map<number, Chore[]>();
+      const day = Number(o.date.slice(8));
+      days.set(day, [...(days.get(day) ?? []), byId.get(o.choreId)!]);
+      result.set(o.memberId, days);
+    }
+    return result;
+  }, [chores, members, year, month0, today, dailyLimit]);
+
+  // memberId -> day of month -> rare chores coming up next week
+  const headsUpByMember = useMemo(() => {
+    const byId = new Map(chores.map((c) => [c.id, c]));
+    const result = new Map<string, Map<number, Chore[]>>();
+    for (const o of headsUps(chores, members, year, month0, today, dailyLimit)) {
       if (!o.memberId) continue;
       const days = result.get(o.memberId) ?? new Map<number, Chore[]>();
       const day = Number(o.date.slice(8));
@@ -122,6 +136,7 @@ export function PrintMonth({
           .filter((m) => picked.has(m.id))
           .map((m) => {
             const days = byMember.get(m.id) ?? new Map<number, Chore[]>();
+            const soon = headsUpByMember.get(m.id) ?? new Map<number, Chore[]>();
             const cheer = CHEERS[(m.name.length + month0) % CHEERS.length];
             const note = notes[noteKey(m.id, year, month0)]?.trim();
             const areas = new Set<string>();
@@ -155,7 +170,7 @@ export function PrintMonth({
                       const list = past ? [] : (days.get(d) ?? []);
                       const cls = past ? 'cal-cell past' : 'cal-cell';
                       return (
-                        <DayCell key={i} className={cls} day={d} chores={list} avatar={m.avatar} locations={locations} free={!past && !list.length} fitKey={note ?? ''} />
+                        <DayCell key={i} className={cls} day={d} chores={list} heads={past ? [] : (soon.get(d) ?? [])} avatar={m.avatar} locations={locations} free={!past && !list.length} fitKey={note ?? ''} />
                       );
                     })}
                   </div>
@@ -198,6 +213,7 @@ function DayCell({
   className,
   day,
   chores,
+  heads,
   avatar,
   locations,
   free,
@@ -206,6 +222,8 @@ function DayCell({
   className: string;
   day: number;
   chores: Chore[];
+  /** Rare chores due a week from this day. */
+  heads: Chore[];
   avatar?: string;
   locations: Map<string, Location>;
   free: boolean;
@@ -241,8 +259,13 @@ function DayCell({
           <ArtImg key={avatar} artKey={artKey(biggest.name)} avatar={avatar} />
         </div>
       )}
-      {chores.length > 0 && (
+      {chores.length + heads.length > 0 && (
         <ul className={`cal-list ${DENSITY[level]}`}>
+          {heads.map((c) => (
+            <li key={`h${c.id}`} className="cal-heads-up">
+              <span>Next week: {compactName(c.name, c.area)}</span>
+            </li>
+          ))}
           {chores.slice(0, shown).map((c, j) => (
             <li key={j}>
               <LocationMark loc={locations.get(c.area)} />
@@ -252,7 +275,7 @@ function DayCell({
           {shown < chores.length && <li className="cal-more">+ {chores.length - shown} more</li>}
         </ul>
       )}
-      {free && <span className="cal-free hollow">Free day!</span>}
+      {free && !heads.length && <span className="cal-free hollow">Free day!</span>}
     </div>
   );
 }

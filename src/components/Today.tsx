@@ -1,6 +1,6 @@
 import { fireAndForget, recordCompletion, updateChore } from '../db';
 import { dueLabel, formatEvery, formatMinutes } from '../format';
-import { addDays, completion, daysUntil, todayStr } from '../rotation';
+import { BIG_EVERY_DAYS, HEADS_UP_DAYS, addDays, completion, daysUntil, todayStr } from '../rotation';
 import type { Chore, Member } from '../types';
 import { MemberSelect } from './inputs';
 import { EVERYONE, PersonFilter, usePersonFilter } from './PersonFilter';
@@ -25,6 +25,10 @@ export function Today({
     .map((c) => ({ c, days: daysUntil(c.nextDue, today) }))
     .sort((a, b) => a.days - b.days || a.c.area.localeCompare(b.c.area));
   const due = visible.filter((x) => x.days <= 0);
+  // Rare, usually bigger jobs get a heads-up a week out so they can be planned around.
+  const comingUp = visible.filter((x) => x.c.everyDays >= BIG_EVERY_DAYS && x.days > 0 && x.days <= HEADS_UP_DAYS);
+  const dayName = (days: number) =>
+    days === 1 ? 'tomorrow' : new Date(`${addDays(today, days)}T12:00`).toLocaleDateString(undefined, { weekday: 'long' });
   const upcoming = visible.filter((x) => x.days > 0 && x.days <= 7);
 
   function done(c: Chore) {
@@ -64,6 +68,20 @@ export function Today({
   return (
     <div>
       <PersonFilter members={members} value={filter} onChange={setFilter} />
+
+      {comingUp.length > 0 && (
+        <div className="notice coming-up">
+          <strong>Coming up</strong>
+          <ul>
+            {comingUp.map(({ c, days }) => (
+              <li key={c.id}>
+                {c.name} ({formatMinutes(c.minutes)}): due {dayName(days)}
+                {c.assigneeId && `, ${members.find((m) => m.id === c.assigneeId)?.name}`}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       <h2>
         Due now <span className="count">{due.length ? `${due.length} · ${total(due)}` : ''}</span>

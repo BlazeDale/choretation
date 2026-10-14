@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_HOME, FEATURES, MAX_MINUTES, generateChores, makeRoom } from './generator';
-import { addDays, completion, coverFreeDays, daysUntil, memberLoads, projectMonth, rebalance, redistribute, scheduleNew } from './rotation';
+import { addDays, completion, coverFreeDays, headsUps, daysUntil, memberLoads, projectMonth, rebalance, redistribute, scheduleNew } from './rotation';
 import type { Chore, HomeConfig, Member, Room } from './types';
 
 const big: HomeConfig = {
@@ -252,6 +252,16 @@ describe('rotation', () => {
       const flexibleOnSundays = plan().filter((c) => c.everyDays >= 7 && weekday(c.nextDue) === 0);
       expect(flexibleOnSundays).toEqual([]);
     });
+  });
+
+  it('gives rare chores a heads-up a week before, even across a month boundary', () => {
+    const base = { key: '', area: 'Bathroom', lastDone: null, lastDoneBy: null, active: true, weekday: null };
+    const chores: Chore[] = [
+      { ...base, id: 'q', name: 'Deep clean', minutes: 75, everyDays: 90, nextDue: '2026-11-03', assigneeId: 'b' },
+      { ...base, id: 'w', name: 'Clean', minutes: 30, everyDays: 7, nextDue: '2026-10-20', assigneeId: 'a' },
+    ];
+    expect(headsUps(chores, members, 2026, 9, today)).toEqual([{ choreId: 'q', date: '2026-10-27', memberId: 'b' }]);
+    expect(headsUps(chores, members, 2026, 10, today)).toEqual([]);
   });
 
   it('handles month and DST boundaries', () => {

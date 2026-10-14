@@ -2,7 +2,7 @@ import { useMemo, useState, type CSSProperties } from 'react';
 import { artKey } from '../choreArt';
 import { formatMinutes } from '../format';
 import { compactName, locationsFor } from '../locations';
-import { projectMonth, todayStr, weekdayOf } from '../rotation';
+import { headsUps, projectMonth, todayStr, weekdayOf } from '../rotation';
 import type { Chore, Member, Room } from '../types';
 import { ArtImg, LocationMark } from './Art';
 
@@ -70,6 +70,17 @@ export function ChoreCalendar({
     return map;
   }, [chores, members, year, month0, today, dailyLimit, who]);
 
+  const soonByDay = useMemo(() => {
+    const byId = new Map(chores.map((c) => [c.id, c]));
+    const map = new Map<number, Due[]>();
+    for (const o of headsUps(chores, members, year, month0, today, dailyLimit)) {
+      if (who && o.memberId !== who) continue;
+      const d = Number(o.date.slice(8));
+      map.set(d, [...(map.get(d) ?? []), { chore: byId.get(o.choreId)!, memberId: o.memberId }]);
+    }
+    return map;
+  }, [chores, members, year, month0, today, dailyLimit, who]);
+
   const person = members.find((m) => m.id === who);
   const goMonth = (n: number) => {
     setOffset(n);
@@ -126,6 +137,7 @@ export function ChoreCalendar({
           const date = dateOf(d);
           const past = date < today;
           const list = byDay.get(d) ?? [];
+          const soon = past ? [] : (soonByDay.get(d) ?? []);
           const offPeople = members.filter((m) => m.freeDays?.includes(weekdayOf(date)));
           const off = !!person && offPeople.includes(person);
           const cls = ['ccal-cell', past && 'past', date === today && 'today', picked === d && 'picked'].filter(Boolean).join(' ');
@@ -151,8 +163,14 @@ export function ChoreCalendar({
                   <ArtImg key={avatarOf(list[0].memberId)} artKey={artKey(list[0].chore.name)} avatar={avatarOf(list[0].memberId)} />
                 </span>
               )}
-              {list.length > 0 && (
+              {list.length + soon.length > 0 && (
                 <ul className="ccal-lines">
+                  {soon.map((x) => (
+                    <li key={`h${x.chore.id}`} className="ccal-heads-up" style={{ '--c': crayon(x.memberId) } as CSSProperties}>
+                      <span className="ccal-ring" />
+                      <span className="ccal-name">Next week: {compactName(x.chore.name, x.chore.area)}</span>
+                    </li>
+                  ))}
                   {list.slice(0, SHOWN).map((x, j) => (
                     <li key={j} style={{ '--c': crayon(x.memberId) } as CSSProperties}>
                       <span className="ccal-dot" />
@@ -170,7 +188,7 @@ export function ChoreCalendar({
                   ))}
                 </span>
               )}
-              {!past && !list.length && <span className="ccal-free">{off ? 'day off' : 'free'}</span>}
+              {!past && !list.length && !soon.length && <span className="ccal-free">{off ? 'day off' : 'free'}</span>}
             </button>
           );
         })}

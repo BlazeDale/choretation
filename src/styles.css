@@ -73,6 +73,8 @@ label.check { flex-direction: row; align-items: center; gap: 8px; color: var(--t
 .hint { color: var(--muted); font-size: 0.9rem; margin: 4px 0 12px; }
 .error { color: var(--danger); }
 .notice { background: var(--brand-soft); border-radius: var(--radius); padding: 10px 14px; }
+.coming-up { margin-bottom: 12px; }
+.coming-up ul { margin: 4px 0 0; padding-left: 1.2em; }
 .empty { color: var(--muted); padding: 8px 0; }
 .summary { background: var(--brand-soft); border-radius: var(--radius); padding: 10px 14px; }
 .grow { flex: 1; min-width: 0; }
@@ -224,6 +226,7 @@ h4.level { margin: 12px 0 6px; font-size: 0.95rem; }
 .ccal-lines li { display: flex; align-items: center; gap: 4px; min-width: 0; }
 .ccal-name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .ccal-more { color: var(--muted); padding-left: 1em; }
+.ccal-heads-up { color: var(--muted); font-style: italic; }
 .ccal-dots { display: none; flex-wrap: wrap; gap: 3px; margin-top: auto; }
 .ccal-free { margin-top: auto; color: var(--muted); font-size: 0.95rem; }
 .ccal .loc img { width: 1.05em; height: 1.05em; }
@@ -333,6 +336,8 @@ h4.level { margin: 12px 0 6px; font-size: 0.95rem; }
 /* At the smallest text size, the picture gives way rather than spilling out of the cell. */
 .cal-cell.lvl-3 .cal-pic { min-height: 17px; } /* still clears the day number */
 .cal-more { padding-left: 1.2em; }
+/* A heads-up for a rare chore a week out: same ink, just an outlined tag so it reads as a note. */
+.cal-heads-up span { border: 1px dashed var(--ink); border-radius: 4px; padding: 0 3px; font-style: italic; }
 .cal-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 1px; min-height: 0; }
 .cal-list li { display: flex; align-items: center; gap: 3px; line-height: 1.1; }
 .cal-list li span:last-child { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
