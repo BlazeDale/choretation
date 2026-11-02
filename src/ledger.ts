@@ -149,6 +149,14 @@ export function keepSince(chores: Pick<Chore, 'everyDays'>[], today: string): st
   return addDays(today, -Math.max(...chores.map((c) => c.everyDays)));
 }
 
+/** Months back from today's to the first with anything recorded, stopping where records fall off. */
+export function monthsBack(oldest: string | null, since: string | null, today: string): number {
+  const index = (date: string) => Number(date.slice(0, 4)) * 12 + Number(date.slice(5, 7));
+  if (!oldest || !since) return 0;
+  const start = oldest > since ? oldest : since;
+  return Math.max(0, index(today) - index(start));
+}
+
 /** Months that have entirely fallen off. */
 export function expiredMonths(records: Pick<MonthRecord, 'month'>[], since: string): string[] {
   return records.map((r) => r.month).filter((m) => boundsOf(m).last < since);

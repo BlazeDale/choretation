@@ -98,6 +98,12 @@ export function watchMonth(uid: string, month: string, cb: (record: MonthRecord 
   return onSnapshot(doc(monthsCol(uid), month), (s) => cb(s.exists() ? (s.data() as MonthRecord) : null));
 }
 
+/** The date of the earliest thing on record, if any. */
+export function watchOldestHistory(uid: string, cb: (date: string | null) => void) {
+  const q = query(historyCol(uid), orderBy('date'), limit(1));
+  return onSnapshot(q, (s) => cb(s.empty ? null : (s.docs[0].data() as HistoryEntry).date));
+}
+
 export function watchHistoryBetween(uid: string, first: string, last: string, cb: (entries: HistoryEntry[]) => void) {
   const q = query(historyCol(uid), where('date', '>=', first), where('date', '<=', last));
   return onSnapshot(q, (s) => cb(s.docs.map((d) => ({ ...(d.data() as Omit<HistoryEntry, 'id'>), id: d.id }))));

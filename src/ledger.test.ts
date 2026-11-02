@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { closeMonths, expiredMonths, keepSince, monthLog, planMonth, undoPatch, undoableEntries } from './ledger';
+import { closeMonths, expiredMonths, keepSince, monthLog, monthsBack, planMonth, undoPatch, undoableEntries } from './ledger';
 import { addDays, daysUntil, redistribute } from './rotation';
 import type { Chore, HistoryEntry, Member, MonthRecord, PlannedChore } from './types';
 
@@ -219,6 +219,14 @@ describe('falling off', () => {
 
   it('keeps nothing-to-go-on safe: no chores means no cutoff', () => {
     expect(keepSince([], '2026-11-02')).toBeNull();
+  });
+
+  it('looks back to the first record, but no further than records are kept', () => {
+    expect(monthsBack('2026-10-14', '2026-08-04', '2026-11-02')).toBe(1);
+    expect(monthsBack('2025-01-01', '2026-08-04', '2026-11-02')).toBe(3);
+    expect(monthsBack('2026-11-02', '2026-08-04', '2026-11-02')).toBe(0);
+    expect(monthsBack('2026-12-20', '2026-08-04', '2027-01-02')).toBe(1);
+    expect(monthsBack(null, '2026-08-04', '2026-11-02')).toBe(0);
   });
 
   it('only drops months that ended before the cutoff', () => {

@@ -1,12 +1,12 @@
-import { useEffect, useMemo, useState, type CSSProperties } from 'react';
+import { useMemo, useState, type CSSProperties } from 'react';
 import { artKey } from '../choreArt';
-import { watchHistoryBetween, watchMonth } from '../db';
 import { formatMinutes } from '../format';
-import { keepSince, monthKey, monthLog, type LogStatus } from '../ledger';
+import type { LogStatus } from '../ledger';
 import { compactName, locationsFor } from '../locations';
 import { headsUps, monthBounds, projectMonth, todayStr, weekdayOf } from '../rotation';
-import type { Chore, HistoryEntry, Member, MonthRecord, Room } from '../types';
+import type { Chore, Member, Room } from '../types';
 import { ArtImg, LocationMark } from './Art';
+import { useMonthLog, useMonthsBack } from './useMonthLog';
 
 /** One crayon per person, in member order. */
 const CRAYONS = ['#4BA3E3', '#5DB760', '#F2B632', '#EE6FA6', '#8A6BDB', '#F28A3C'];
@@ -69,29 +69,12 @@ export function ChoreCalendar({
   };
   const avatarOf = (id: string | null) => members.find((m) => m.id === id)?.avatar;
   const { first: monthFirst, last: monthLast } = monthBounds(year, month0);
-  const hasPast = monthFirst < today;
-  // Back as far as records are kept: the longest chore period.
-  const since = keepSince(chores, today);
-  const oldest = since ? new Date(`${monthKey(since)}-01T12:00`) : now;
-  const minOffset = (oldest.getFullYear() - now.getFullYear()) * 12 + oldest.getMonth() - now.getMonth();
-
-  const [record, setRecord] = useState<MonthRecord | null>(null);
-  const [done, setDone] = useState<HistoryEntry[]>([]);
-  useEffect(() => {
-    setRecord(null);
-    setDone([]);
-    if (!hasPast) return;
-    const offMonth = watchMonth(uid, `${year}-${String(month0 + 1).padStart(2, '0')}`, setRecord);
-    const offDone = watchHistoryBetween(uid, monthFirst, monthLast, setDone);
-    return () => {
-      offMonth();
-      offDone();
-    };
-  }, [uid, year, month0, hasPast, monthFirst, monthLast]);
+  const minOffset = -useMonthsBack(uid, chores, today);
+  const { items: logged, hasPlan } = useMonthLog(uid, year, month0, today, monthFirst < today);
 
   const locations = useMemo(
-    () => locationsFor([...chores.map((c) => c.area), ...(record?.planned ?? []).map((p) => p.area)], rooms),
-    [chores, record, rooms],
+    () => locationsFor([...chores.map((c) => c.area), ...logged.map((i) => i.area)], rooms),
+    [chores, logged, rooms],
   );
 
   const byDay = useMemo(() => {
@@ -102,7 +85,7 @@ export function ChoreCalendar({
       const d = Number(date.slice(8));
       map.set(d, [...(map.get(d) ?? []), due]);
     };
-    for (const i of monthLog(record?.planned ?? [], done, today)) {
+    for (const i of logged) {
       add(i.date, { chore: { id: i.choreId, name: i.name, area: i.area, minutes: i.minutes }, memberId: i.memberId, status: i.status });
     }
     for (const o of projectMonth(chores, members, year, month0, today, dailyLimit)) {
@@ -110,7 +93,7 @@ export function ChoreCalendar({
     }
     for (const list of map.values()) list.sort((a, b) => b.chore.minutes - a.chore.minutes);
     return map;
-  }, [chores, members, year, month0, today, dailyLimit, who, record, done]);
+  }, [chores, members, year, month0, today, dailyLimit, who, logged]);
 
   const soonByDay = useMemo(() => {
     const byId = new Map(chores.map((c) => [c.id, c]));
@@ -167,6 +150,14 @@ export function ChoreCalendar({
           ))}
         </div>
       </div>
+
+      {monthLast < today && (
+        <p className="hint">
+          {hasPlan
+            ? 'This month is locked.'
+            : "This month is locked, but its plan wasn't saved (that started Nov 2, 2026), so it only shows chores that were ticked off."}
+        </p>
+      )}
 
       <div className="ccal-grid">
         {DOW.map((d) => (

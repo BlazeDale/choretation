@@ -4,6 +4,9 @@ import { compactName, locationsFor, type Location } from '../locations';
 import { ArtImg, LocationMark } from './Art';
 import { headsUps, projectMonth, todayStr } from '../rotation';
 import type { Chore, Member, Room } from '../types';
+import { useMonthLog, useMonthsBack } from './useMonthLog';
+
+type DayChore = Pick<Chore, 'id' | 'name' | 'area' | 'minutes'>;
 
 const DOW = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const CHEERS = ['You shine!', 'Superstar mode', 'Reach for the stars', 'Sparkle on', 'Shoot for the moon'];
@@ -18,6 +21,7 @@ export const noteKey = (memberId: string, year: number, month0: number) =>
   `${memberId}_${year}-${String(month0 + 1).padStart(2, '0')}`;
 
 export function PrintMonth({
+  uid,
   chores,
   members,
   rooms,
@@ -25,6 +29,7 @@ export function PrintMonth({
   notes,
   onNote,
 }: {
+  uid: string;
   chores: Chore[];
   members: Member[];
   rooms: Room[];
@@ -43,7 +48,11 @@ export function PrintMonth({
   const lead = new Date(year, month0, 1).getDay();
   const cells = Array.from({ length: Math.ceil((lead + daysInMonth) / 7) * 7 }, (_, i) => i - lead + 1);
   const today = todayStr(now);
-  const isPast = (d: number) => todayStr(new Date(year, month0, d)) < today;
+  // A month that's over shows its locked record in full; in this month, past days are greyed out.
+  const lockedMonth = todayStr(new Date(year, month0 + 1, 0)) < today;
+  const isPast = (d: number) => !lockedMonth && todayStr(new Date(year, month0, d)) < today;
+  const monthsBack = useMonthsBack(uid, chores, today);
+  const { items: logged, hasPlan } = useMonthLog(uid, year, month0, today, lockedMonth);
   // Weeks that are already over get squeezed so the weeks ahead have room for their chores.
   const weekRows = Array.from({ length: cells.length / 7 }, (_, w) =>
     cells.slice(w * 7, w * 7 + 7).every((d) => d < 1 || d > daysInMonth || isPast(d)) ? 'minmax(0, 0.3fr)' : 'minmax(0, 1fr)',
@@ -52,16 +61,21 @@ export function PrintMonth({
   // memberId -> day of month -> chores due that day
   const byMember = useMemo(() => {
     const byId = new Map(chores.map((c) => [c.id, c]));
-    const result = new Map<string, Map<number, Chore[]>>();
-    for (const o of projectMonth(chores, members, year, month0, today, dailyLimit)) {
-      if (!o.memberId) continue;
-      const days = result.get(o.memberId) ?? new Map<number, Chore[]>();
-      const day = Number(o.date.slice(8));
-      days.set(day, [...(days.get(day) ?? []), byId.get(o.choreId)!]);
-      result.set(o.memberId, days);
+    const result = new Map<string, Map<number, DayChore[]>>();
+    const add = (memberId: string | null, date: string, chore: DayChore) => {
+      if (!memberId) return;
+      const days = result.get(memberId) ?? new Map<number, DayChore[]>();
+      const day = Number(date.slice(8));
+      days.set(day, [...(days.get(day) ?? []), chore]);
+      result.set(memberId, days);
+    };
+    if (lockedMonth) {
+      for (const i of logged) add(i.memberId, i.date, { id: i.choreId, name: i.name, area: i.area, minutes: i.minutes });
+    } else {
+      for (const o of projectMonth(chores, members, year, month0, today, dailyLimit)) add(o.memberId, o.date, byId.get(o.choreId)!);
     }
     return result;
-  }, [chores, members, year, month0, today, dailyLimit]);
+  }, [chores, members, year, month0, today, dailyLimit, lockedMonth, logged]);
 
   // memberId -> day of month -> rare chores coming up next week
   const headsUpByMember = useMemo(() => {
@@ -78,7 +92,10 @@ export function PrintMonth({
   }, [chores, members, year, month0, today, dailyLimit]);
 
   // Same icons on everyone's sheet, so numbering comes from every chore's area.
-  const locations = useMemo(() => locationsFor(chores.map((c) => c.area), rooms), [chores, rooms]);
+  const locations = useMemo(
+    () => locationsFor([...chores.map((c) => c.area), ...logged.map((i) => i.area)], rooms),
+    [chores, logged, rooms],
+  );
 
   const toggle = (id: string) =>
     setPicked((p) => {
@@ -93,8 +110,16 @@ export function PrintMonth({
       <div className="card-panel no-print print-controls">
         <div className="inline">
           <select value={offset} onChange={(e) => setOffset(Number(e.target.value))} aria-label="Month">
-            <option value={0}>This month</option>
             <option value={1}>Next month</option>
+            <option value={0}>This month</option>
+            {Array.from({ length: monthsBack }, (_, i) => {
+              const d = new Date(now.getFullYear(), now.getMonth() - i - 1, 1);
+              return (
+                <option key={i} value={-i - 1}>
+                  {d.toLocaleString(undefined, { month: 'long', year: 'numeric' })} (locked)
+                </option>
+              );
+            })}
           </select>
           {members.map((m) => (
             <label key={m.id} className="check">
@@ -103,7 +128,7 @@ export function PrintMonth({
             </label>
           ))}
         </div>
-        {members
+        {!lockedMonth && members
           .filter((m) => picked.has(m.id))
           .map((m) => {
             const key = noteKey(m.id, year, month0);
@@ -126,8 +151,11 @@ export function PrintMonth({
           🖨️ Print chore calendars
         </button>
         <p className="hint">
-          One landscape page per person for the whole month, with each day's chores written in. Color in a chore's
-          picture when it's done. Past days are greyed out.
+          {!lockedMonth
+            ? "One landscape page per person for the whole month, with each day's chores written in. Color in a chore's picture when it's done. Past days are greyed out."
+            : hasPlan
+              ? 'This month is locked: it shows what happened and can no longer change.'
+              : "This month is locked, but its plan wasn't saved (that started Nov 2, 2026), so it only shows chores that were ticked off."}
         </p>
       </div>
 
@@ -135,7 +163,7 @@ export function PrintMonth({
         {members
           .filter((m) => picked.has(m.id))
           .map((m) => {
-            const days = byMember.get(m.id) ?? new Map<number, Chore[]>();
+            const days = byMember.get(m.id) ?? new Map<number, DayChore[]>();
             const soon = headsUpByMember.get(m.id) ?? new Map<number, Chore[]>();
             const cheer = CHEERS[(m.name.length + month0) % CHEERS.length];
             const note = notes[noteKey(m.id, year, month0)]?.trim();
@@ -170,7 +198,7 @@ export function PrintMonth({
                       const list = past ? [] : (days.get(d) ?? []);
                       const cls = past ? 'cal-cell past' : 'cal-cell';
                       return (
-                        <DayCell key={i} className={cls} day={d} chores={list} heads={past ? [] : (soon.get(d) ?? [])} avatar={m.avatar} locations={locations} free={!past && !list.length} fitKey={note ?? ''} />
+                        <DayCell key={i} className={cls} day={d} chores={list} heads={past ? [] : (soon.get(d) ?? [])} avatar={m.avatar} locations={locations} free={!past && !lockedMonth && !list.length} fitKey={note ?? ''} />
                       );
                     })}
                   </div>
@@ -221,9 +249,9 @@ function DayCell({
 }: {
   className: string;
   day: number;
-  chores: Chore[];
+  chores: DayChore[];
   /** Rare chores due a week from this day. */
-  heads: Chore[];
+  heads: DayChore[];
   avatar?: string;
   locations: Map<string, Location>;
   free: boolean;
@@ -249,7 +277,7 @@ function DayCell({
     else if (shown > 1) setShown(shown - 1);
   }, [level, shown, fontsReady, chores]);
 
-  const biggest = chores.reduce<Chore | null>((b, c) => (!b || c.minutes > b.minutes ? c : b), null);
+  const biggest = chores.reduce<DayChore | null>((b, c) => (!b || c.minutes > b.minutes ? c : b), null);
 
   return (
     <div ref={ref} className={`${className} lvl-${level}`}>

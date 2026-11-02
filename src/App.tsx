@@ -97,6 +97,7 @@ function Main() {
       {tab === 'Chores' && <ChoreList {...props} rooms={household.home?.rooms ?? []} />}
       {tab === 'Print' && (
         <PrintMonth
+          uid={user.uid}
           chores={chores}
           members={household.members}
           rooms={household.home?.rooms ?? []}
