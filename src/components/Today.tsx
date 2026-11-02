@@ -1,7 +1,8 @@
-import { fireAndForget, recordCompletion, updateChore } from '../db';
+import { useState } from 'react';
+import { fireAndForget, recordCompletion, undoCompletion, updateChore } from '../db';
 import { dueLabel, formatEvery, formatMinutes } from '../format';
 import { BIG_EVERY_DAYS, HEADS_UP_DAYS, addDays, completion, daysUntil, todayStr } from '../rotation';
-import type { Chore, Member } from '../types';
+import type { Chore, ChoreTurn, Member } from '../types';
 import { MemberSelect } from './inputs';
 import { EVERYONE, PersonFilter, usePersonFilter } from './PersonFilter';
 
@@ -17,6 +18,8 @@ export function Today({
   dailyLimit: number;
 }) {
   const [filter, setFilter] = usePersonFilter(members);
+  // Ticked since opening this tab, each with an undo in case the click was a slip.
+  const [ticked, setTicked] = useState<Array<{ entryId: string; choreId: string; name: string; before: ChoreTurn }>>([]);
 
   const today = todayStr();
   const visible = chores
@@ -34,7 +37,15 @@ export function Today({
   function done(c: Chore) {
     const by = c.assigneeId ?? (filter !== EVERYONE ? filter : members[0]?.id);
     if (!by) return;
-    fireAndForget(recordCompletion(uid, c, completion(c, chores, members, by, today, dailyLimit), by, today));
+    const before = { nextDue: c.nextDue, assigneeId: c.assigneeId, lastDone: c.lastDone, lastDoneBy: c.lastDoneBy };
+    const { entryId, saved } = recordCompletion(uid, c, completion(c, chores, members, by, today, dailyLimit), by, today);
+    fireAndForget(saved);
+    setTicked((list) => [{ entryId, choreId: c.id, name: c.name, before }, ...list]);
+  }
+
+  function undo(t: (typeof ticked)[number]) {
+    fireAndForget(undoCompletion(uid, t.entryId, t.choreId, t.before));
+    setTicked((list) => list.filter((x) => x.entryId !== t.entryId));
   }
 
   const card = ({ c, days }: { c: Chore; days: number }) => (
@@ -68,6 +79,21 @@ export function Today({
   return (
     <div>
       <PersonFilter members={members} value={filter} onChange={setFilter} />
+
+      {ticked.length > 0 && (
+        <div className="notice">
+          <ul className="undo-list">
+            {ticked.map((t) => (
+              <li key={t.entryId}>
+                Marked "{t.name}" done.{' '}
+                <button className="link" onClick={() => undo(t)}>
+                  Undo
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       {comingUp.length > 0 && (
         <div className="notice coming-up">

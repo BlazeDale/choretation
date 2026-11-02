@@ -15,7 +15,7 @@ import {
 import { db } from './firebase';
 import { closeMonths, expiredMonths, keepSince, monthKey, planMonth, samePlan } from './ledger';
 import { todayStr } from './rotation';
-import type { Chore, HistoryEntry, Household, Member, MonthRecord, NewChore } from './types';
+import type { Chore, ChoreTurn, HistoryEntry, Household, Member, MonthRecord, NewChore } from './types';
 
 // Layout: households/{uid} with `chores`, `history` and `months` subcollections.
 const householdRef = (uid: string) => doc(db, 'households', uid);
@@ -66,8 +66,10 @@ export function deleteChore(uid: string, id: string) {
   return deleteDoc(doc(choresCol(uid), id));
 }
 
+/** Saves a tick and moves the chore on. Returns the history entry's id, for undoing it. */
 export function recordCompletion(uid: string, chore: Chore, patch: Partial<NewChore>, memberId: string, date: string) {
   const batch = writeBatch(db);
+  const ref = doc(historyCol(uid));
   batch.update(doc(choresCol(uid), chore.id), patch);
   const entry: Omit<HistoryEntry, 'id'> = {
     choreId: chore.id,
@@ -77,8 +79,17 @@ export function recordCompletion(uid: string, chore: Chore, patch: Partial<NewCh
     date,
     at: Date.now(),
     area: chore.area,
+    before: { nextDue: chore.nextDue, assigneeId: chore.assigneeId, lastDone: chore.lastDone, lastDoneBy: chore.lastDoneBy },
   };
-  batch.set(doc(historyCol(uid)), entry);
+  batch.set(ref, entry);
+  return { entryId: ref.id, saved: batch.commit() };
+}
+
+/** Takes a tick back: removes it from history and puts the chore as it was. */
+export function undoCompletion(uid: string, entryId: string, choreId: string, before: ChoreTurn) {
+  const batch = writeBatch(db);
+  batch.delete(doc(historyCol(uid), entryId));
+  batch.update(doc(choresCol(uid), choreId), before);
   return batch.commit();
 }
 

@@ -105,7 +105,7 @@ function Main() {
           onNote={(key, text) => fireAndForget(saveHousehold(user.uid, { notes: { [key]: text } }))}
         />
       )}
-      {tab === 'History' && <History uid={user.uid} members={household.members} />}
+      {tab === 'History' && <History uid={user.uid} members={household.members} chores={chores} />}
       {tab === 'Settings' && <Settings uid={user.uid} household={household} chores={chores} />}
     </div>
   );

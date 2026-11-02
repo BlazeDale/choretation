@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
-import { watchHistory } from '../db';
+import { fireAndForget, undoCompletion, watchHistory } from '../db';
 import { formatMinutes } from '../format';
+import { undoPatch, undoableEntries } from '../ledger';
 import { addDays, todayStr } from '../rotation';
-import type { HistoryEntry, Member } from '../types';
+import type { Chore, HistoryEntry, Member } from '../types';
 
-export function History({ uid, members }: { uid: string; members: Member[] }) {
+export function History({ uid, members, chores }: { uid: string; members: Member[]; chores: Chore[] }) {
   const [entries, setEntries] = useState<HistoryEntry[] | null>(null);
   useEffect(() => watchHistory(uid, 200, setEntries), [uid]);
 
@@ -13,6 +14,14 @@ export function History({ uid, members }: { uid: string; members: Member[] }) {
   const since = addDays(todayStr(), -30);
   const recent = entries.filter((e) => e.date >= since);
   const nameOf = (id: string) => members.find((m) => m.id === id)?.name ?? 'Former member';
+  const undoable = undoableEntries(entries, chores, todayStr());
+
+  function undo(e: HistoryEntry) {
+    const chore = chores.find((c) => c.id === e.choreId);
+    if (!chore) return;
+    const previous = entries!.slice(entries!.indexOf(e) + 1).find((x) => x.choreId === e.choreId);
+    fireAndForget(undoCompletion(uid, e.id, e.choreId, undoPatch(e, chore, previous)));
+  }
 
   return (
     <div>
@@ -38,6 +47,11 @@ export function History({ uid, members }: { uid: string; members: Member[] }) {
                 {nameOf(e.memberId)} · {formatMinutes(e.minutes)} · {e.date}
                 {e.assumed && ' · not ticked, counted as done'}
               </span>
+              {undoable.has(e.id) && (
+                <button className="link" onClick={() => undo(e)}>
+                  Undo
+                </button>
+              )}
             </li>
           ))}
         </ul>

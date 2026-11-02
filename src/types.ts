@@ -118,7 +118,12 @@ export interface HistoryEntry {
   area?: string;
   /** Never ticked in the app: counted as done on its planned date when its month closed. */
   assumed?: boolean;
+  /** The chore as it was before this tick, for undoing it. */
+  before?: ChoreTurn;
 }
+
+/** The parts of a chore that a completion moves on. */
+export type ChoreTurn = Pick<Chore, 'nextDue' | 'assigneeId' | 'lastDone' | 'lastDoneBy'>;
 
 /** One chore on a day's plan, copied so it survives the chore being changed or deleted later. */
 export interface PlannedChore {

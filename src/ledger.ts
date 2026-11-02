@@ -1,5 +1,5 @@
 import { addDays, completion, monthBounds, projectMonth } from './rotation';
-import type { Chore, HistoryEntry, Member, MonthRecord, PlannedChore } from './types';
+import type { Chore, ChoreTurn, HistoryEntry, Member, MonthRecord, PlannedChore } from './types';
 
 export const monthKey = (date: string) => date.slice(0, 7);
 
@@ -154,4 +154,34 @@ export function expiredMonths(records: Pick<MonthRecord, 'month'>[], since: stri
   return records.map((r) => r.month).filter((m) => boundsOf(m).last < since);
 }
 
-export const samePlan = (a: PlannedChore[], b: PlannedChore[]) => JSON.stringify(a) === JSON.stringify(b);
+/**
+ * Which ticks can still be undone: each chore's latest one, if it was really ticked and is from this
+ * month. Closed months are final. `entries` is newest first.
+ */
+export function undoableEntries(entries: HistoryEntry[], chores: Pick<Chore, 'id'>[], today: string): Set<string> {
+  const out = new Set<string>();
+  const seen = new Set<string>();
+  for (const e of entries) {
+    if (seen.has(e.choreId)) continue;
+    seen.add(e.choreId);
+    if (!e.assumed && monthKey(e.date) === monthKey(today) && chores.some((c) => c.id === e.choreId)) out.add(e.id);
+  }
+  return out;
+}
+
+/**
+ * How a chore goes back to before a tick. Ticks that didn't save their "before" get it worked out: one
+ * period back from its next date, and last done from the tick before (`previous`), if there was one.
+ */
+export function undoPatch(entry: HistoryEntry, chore: Pick<Chore, 'nextDue' | 'everyDays'>, previous?: HistoryEntry): ChoreTurn {
+  return (
+    entry.before ?? {
+      nextDue: addDays(chore.nextDue, -chore.everyDays),
+      assigneeId: entry.memberId,
+      lastDone: previous?.date ?? null,
+      lastDoneBy: previous?.memberId ?? null,
+    }
+  );
+}
+
+export const samePlan =(a: PlannedChore[], b: PlannedChore[]) => JSON.stringify(a) === JSON.stringify(b);

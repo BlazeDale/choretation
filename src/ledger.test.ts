@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { closeMonths, expiredMonths, keepSince, monthLog, planMonth } from './ledger';
+import { closeMonths, expiredMonths, keepSince, monthLog, planMonth, undoPatch, undoableEntries } from './ledger';
 import { addDays, daysUntil, redistribute } from './rotation';
 import type { Chore, HistoryEntry, Member, MonthRecord, PlannedChore } from './types';
 
@@ -178,6 +178,37 @@ describe('monthLog', () => {
 
   it('keeps showing a deleted chore, from its copied details', () => {
     expect(monthLog([plan('gone', '2026-11-20')], [], '2026-11-25')[0].name).toBe('Chore gone');
+  });
+});
+
+describe('undo', () => {
+  const today = '2026-11-02';
+
+  it('puts back exactly what a tick saved', () => {
+    const before = { nextDue: '2026-11-02', assigneeId: 'b', lastDone: '2026-10-19', lastDoneBy: 'b' };
+    expect(undoPatch(done('x', today, { before }), chore('x', 14, '2026-11-16'))).toEqual(before);
+  });
+
+  it('works back from the real ticks that saved nothing, like the Monday bins', () => {
+    const c = (everyDays: number, nextDue: string) => chore('x', everyDays, nextDue);
+    expect(undoPatch(done('x', today), c(14, '2026-11-16')).nextDue).toBe('2026-11-02');
+    expect(undoPatch(done('x', today), c(7, '2026-11-03')).nextDue).toBe('2026-10-27');
+    expect(undoPatch(done('x', today), c(14, '2026-11-09'), done('x', '2026-10-14'))).toEqual({
+      nextDue: '2026-10-26',
+      assigneeId: 'a',
+      lastDone: '2026-10-14',
+      lastDoneBy: 'a',
+    });
+  });
+
+  it("offers only each chore's latest tick", () => {
+    const entries = [done('x', '2026-11-02'), done('x', '2026-11-01'), done('y', '2026-11-02')];
+    expect([...undoableEntries(entries, [{ id: 'x' }, { id: 'y' }], today)]).toEqual([entries[0].id, entries[2].id]);
+  });
+
+  it('leaves closed months, assumed chores and deleted chores alone', () => {
+    const entries = [done('old', '2026-10-14'), done('auto', today, { assumed: true }), done('gone', today)];
+    expect([...undoableEntries(entries, [{ id: 'old' }, { id: 'auto' }], today)]).toEqual([]);
   });
 });
 
