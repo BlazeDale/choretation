@@ -1,4 +1,4 @@
-import { addDays, completion, monthBounds, projectMonth } from './rotation';
+import { addDays, completion, monthBounds, nextWorkingDay, projectMonth } from './rotation';
 import type { Chore, ChoreTurn, HistoryEntry, Member, MonthRecord, PlannedChore } from './types';
 
 export const monthKey = (date: string) => date.slice(0, 7);
@@ -108,7 +108,67 @@ export function closeMonths(
   return result;
 }
 
-export type LogStatus = 'ticked' | 'assumed' | 'waiting';
+/**
+ * Fills in the time before plans were saved, from the household's first record up to the first saved
+ * plan. Nothing says what was planned then, so each chore's turns are worked out by counting back from
+ * its current schedule, and all are counted as done, the same as any unticked chore in a finished month.
+ * Whole months get a record, which also stops this running again. Anything still overdue is left
+ * for closeMonths, which runs next and closes these months.
+ */
+export function backfillMonths(
+  chores: Chore[],
+  members: Member[],
+  records: MonthRecord[],
+  history: Pick<HistoryEntry, 'choreId' | 'date'>[],
+  oldest: string | null,
+  since: string | null,
+): Omit<MonthClosing, 'months'> & { months: MonthRecord[] } {
+  const none = { months: [], history: [], patches: [] };
+  const saved = records.flatMap((r) => r.planned.map((p) => p.date)).sort()[0];
+  const firstRecord = records.map((r) => r.month).sort()[0];
+  if (!oldest || !saved || !firstRecord) return none;
+  const start = since && since > oldest ? since : oldest;
+  if (monthKey(start) >= firstRecord) return none;
+
+  const entries: HistoryEntry[] = [];
+  const planned = new Map<string, PlannedChore[]>();
+  const patches: Array<[string, Partial<Chore>]> = [];
+  for (const c of chores) {
+    if (!c.active || !c.assigneeId || c.everyDays < 1) continue;
+    let latest: string | null = null;
+    for (let turn = addDays(c.nextDue, -c.everyDays); turn >= start; turn = addDays(turn, -c.everyDays)) {
+      const date = c.weekday != null ? turn : nextWorkingDay(members, turn);
+      if (date >= saved) continue;
+      if (!latest) latest = date;
+      const month = monthKey(date);
+      if (month < firstRecord) {
+        const plan = { choreId: c.id, name: c.name, area: c.area, minutes: c.minutes, date, memberId: c.assigneeId };
+        planned.set(month, [...(planned.get(month) ?? []), plan]);
+      }
+      if (history.some((h) => h.choreId === c.id && h.date === date)) continue;
+      entries.push({
+        id: `assumed_${c.id}_${date}`,
+        choreId: c.id,
+        choreName: c.name,
+        area: c.area,
+        memberId: c.assigneeId,
+        minutes: c.minutes,
+        date,
+        at: new Date(`${date}T12:00`).getTime(),
+        assumed: true,
+      });
+    }
+    if (latest && latest > (c.lastDone ?? '')) patches.push([c.id, { lastDone: latest, lastDoneBy: c.assigneeId }]);
+  }
+
+  const months: MonthRecord[] = [];
+  for (let month = monthKey(start); month < firstRecord; month = nextMonth(month)) {
+    months.push({ month, planned: (planned.get(month) ?? []).sort(byDateThenChore), closed: false });
+  }
+  return { months, history: entries, patches };
+}
+
+export type LogStatus ='ticked' | 'assumed' | 'waiting';
 
 export interface LogItem {
   choreId: string;

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { closeMonths, expiredMonths, keepSince, monthLog, monthsBack, planMonth, undoPatch, undoableEntries } from './ledger';
+import { backfillMonths, closeMonths, expiredMonths, keepSince, monthLog, monthsBack, planMonth, undoPatch, undoableEntries } from './ledger';
 import { addDays, daysUntil, redistribute } from './rotation';
 import type { Chore, HistoryEntry, Member, MonthRecord, PlannedChore } from './types';
 
@@ -178,6 +178,71 @@ describe('monthLog', () => {
 
   it('keeps showing a deleted chore, from its copied details', () => {
     expect(monthLog([plan('gone', '2026-11-20')], [], '2026-11-25')[0].name).toBe('Chore gone');
+  });
+});
+
+describe('backfillMonths', () => {
+  const nov = open('2026-11', [plan('z', '2026-11-02')]);
+  const run = (chores: Chore[], history: Pick<HistoryEntry, 'choreId' | 'date'>[] = [], since = '2026-08-04') =>
+    backfillMonths(chores, members, [nov], history, '2026-10-14', since);
+  const dates = (out: ReturnType<typeof run>, id: string) => out.history.filter((h) => h.choreId === id).map((h) => h.date).sort();
+
+  it('counts back each turn from the first record, marked as counted done', () => {
+    const out = run([chore('w', 7, '2026-11-05')]);
+    expect(dates(out, 'w')).toEqual(['2026-10-15', '2026-10-22', '2026-10-29']);
+    expect(out.history.every((h) => h.assumed)).toBe(true);
+    expect(out.months).toMatchObject([{ month: '2026-10', closed: false }]);
+    expect(out.months[0].planned.map((p) => p.date)).toEqual(['2026-10-15', '2026-10-22', '2026-10-29']);
+  });
+
+  it('leaves the Monday bins exactly on their pattern', () => {
+    const trash = chore('t', 14, '2026-11-09', { weekday: 1, lastDone: '2026-11-02' });
+    const recycling = chore('r', 14, '2026-11-16', { weekday: 1, lastDone: '2026-11-02' });
+    const out = run([trash, recycling]);
+    expect(dates(out, 't')).toEqual(['2026-10-26']);
+    expect(dates(out, 'r')).toEqual(['2026-10-19']);
+    expect(out.patches).toEqual([]);
+  });
+
+  it('includes days before the first saved plan in a recorded month, without changing that record', () => {
+    const out = run([chore('s', 7, '2026-11-08')]);
+    expect(dates(out, 's')).toEqual(['2026-10-18', '2026-10-25', '2026-11-01']);
+    expect(out.months.map((m) => m.month)).toEqual(['2026-10']);
+    expect(out.months[0].planned.map((p) => p.date)).toEqual(['2026-10-18', '2026-10-25']);
+  });
+
+  it('sets last done so the cadence holds from then on', () => {
+    const out = run([chore('q', 90, '2027-01-17')]);
+    expect(dates(out, 'q')).toEqual(['2026-10-19']);
+    expect(out.patches).toEqual([['q', { lastDone: '2026-10-19', lastDoneBy: 'a' }]]);
+  });
+
+  it('does not count a turn already ticked, or one before the household began', () => {
+    const out = run([chore('w', 7, '2026-11-05')], [{ choreId: 'w', date: '2026-10-22' }]);
+    expect(dates(out, 'w')).toEqual(['2026-10-15', '2026-10-29']);
+    expect(dates(run([chore('d', 90, '2027-01-01')]), 'd')).toEqual([]);
+  });
+
+  it('runs only once, because the month then has a record', () => {
+    const out = backfillMonths([chore('w', 7, '2026-11-05')], members, [open('2026-10'), nov], [], '2026-10-14', '2026-08-04');
+    expect(out.history).toEqual([]);
+    expect(out.months).toEqual([]);
+  });
+
+  it('skips turned-off chores, and does nothing with no record to start from', () => {
+    expect(run([chore('w', 7, '2026-11-05', { active: false })]).history).toEqual([]);
+    expect(backfillMonths([chore('w', 7, '2026-11-05')], members, [], [], '2026-10-14', null).months).toEqual([]);
+    expect(backfillMonths([chore('w', 7, '2026-11-05')], members, [nov], [], null, null).months).toEqual([]);
+  });
+
+  it('leaves a chore still overdue for closing, which counts it done and moves it on', () => {
+    const c = chore('o', 180, '2026-10-20');
+    const out = run([c]);
+    expect(out.history).toEqual([]);
+    const closed = closeMonths([c], members, [...out.months, nov], '2026-11-02', LIMIT);
+    expect(closed.history.map((h) => h.date)).toEqual(['2026-10-20']);
+    expect(closed.months.map((m) => m.month)).toEqual(['2026-10']);
+    expect(closed.patches[0][1].nextDue).toBe('2027-04-18');
   });
 });
 

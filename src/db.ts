@@ -13,7 +13,7 @@ import {
   writeBatch,
 } from 'firebase/firestore';
 import { db } from './firebase';
-import { closeMonths, expiredMonths, keepSince, monthKey, planMonth, samePlan } from './ledger';
+import { backfillMonths, closeMonths, expiredMonths, keepSince, monthKey, planMonth, samePlan } from './ledger';
 import { todayStr } from './rotation';
 import type { Chore, ChoreTurn, HistoryEntry, Household, Member, MonthRecord, NewChore } from './types';
 
@@ -129,6 +129,25 @@ export async function syncLedger(uid: string, members: Member[], dailyLimit: num
   if (!chores.length) return;
   let records = monthDocs.docs.map((d) => d.data() as MonthRecord);
   const today = todayStr();
+
+  // Time before plans were saved. Its record goes last, since that's what stops this running again.
+  const known = await getDocsFromServer(query(historyCol(uid), orderBy('date')));
+  const entries = known.docs.map((d) => d.data() as HistoryEntry);
+  const backfill = backfillMonths(chores, members, records, entries, entries[0]?.date ?? null, keepSince(chores, today));
+  if (backfill.months.length) {
+    for (let i = 0; i < backfill.history.length; i += BATCH_LIMIT) {
+      const batch = writeBatch(db);
+      for (const { id, ...entry } of backfill.history.slice(i, i + BATCH_LIMIT)) batch.set(doc(historyCol(uid), id), entry);
+      await batch.commit();
+    }
+    if (backfill.patches.length) await updateChores(uid, backfill.patches);
+    const batch = writeBatch(db);
+    for (const r of backfill.months) batch.set(doc(monthsCol(uid), r.month), r);
+    await batch.commit();
+    const patches = new Map(backfill.patches);
+    chores = chores.map((c) => ({ ...c, ...patches.get(c.id) }));
+    records = [...records, ...backfill.months];
+  }
 
   const closing = closeMonths(chores, members, records, today, dailyLimit);
   // History ids are fixed per chore and day, so an interrupted close repeats safely. Closed flags go last.
