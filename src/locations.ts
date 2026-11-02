@@ -1,4 +1,112 @@
-import type { Room } from './types';
+import type { Chore, ChoreDraft, HomeConfig, Place, Room } from './types';
+
+const BUILT_IN: Record<string, string> = {
+  home: 'Whole home',
+  outdoor: 'Outdoor',
+  yard: 'Yard',
+  laundry: 'Laundry',
+  pets: 'Pets',
+  errands: 'Errands',
+  vehicles: 'Vehicles',
+  pool: 'Pool',
+  hotTub: 'Hot tub',
+  other: 'Other',
+};
+const PLACE_TOKEN = '{place}';
+const floorId = (level: number) => `floor:${level}`;
+export const floorName = (level: number) => (level === 0 ? 'Basement level' : `Floor ${level}`);
+const slugify = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+const regexEscape = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+type LinkHome = Pick<HomeConfig, 'rooms' | 'places'>;
+
+/** A location's current name, or null if nothing has that id any more. */
+export function locationName(id: string, home: LinkHome): string | null {
+  const floor = /^floor:(\d+)$/.exec(id);
+  if (floor) return floorName(Number(floor[1]));
+  return (
+    home.rooms.find((r) => r.id === id)?.name.trim() || home.places?.find((p) => p.id === id)?.name || BUILT_IN[id] || null
+  );
+}
+
+/** The location with this name, if there is one. */
+export function locationIdFor(area: string, home: LinkHome): string | null {
+  const name = area.trim().toLowerCase();
+  const room = home.rooms.find((r) => r.name.trim().toLowerCase() === name);
+  if (room) return room.id;
+  if (name === 'basement level') return floorId(0);
+  const floor = /^floor (\d+)$/.exec(name);
+  if (floor) return floorId(Number(floor[1]));
+  const place = home.places?.find((p) => p.name.trim().toLowerCase() === name);
+  if (place) return place.id;
+  return Object.keys(BUILT_IN).find((id) => BUILT_IN[id].toLowerCase() === name) ?? null;
+}
+
+/** Only rooms and places can be renamed, so only they need their name replaced by the token. */
+const isRenamable = (id: string, home: LinkHome) =>
+  home.rooms.some((r) => r.id === id) || !!home.places?.some((p) => p.id === id);
+
+/** A chore name as stored for a location, with that location's name swapped for {place}. */
+export function toTask(name: string, id: string, home: LinkHome): string {
+  const place = locationName(id, home);
+  if (!place || !isRenamable(id, home)) return name;
+  return name.replace(new RegExp(`(?<![\\w])${regexEscape(place)}(?![\\w])`, 'g'), PLACE_TOKEN);
+}
+
+/**
+ * The link between a generated or existing chore and its location. A name no location has becomes a
+ * new place (returned, to be saved with the home). The key follows the location too, so renaming a
+ * room doesn't make its chores look new.
+ */
+export function linkChore(
+  c: Pick<ChoreDraft, 'area' | 'name' | 'key'>,
+  home: LinkHome,
+  newId: () => string,
+): { locationId: string; task: string; key: string; newPlace?: Place } {
+  const area = c.area.trim() || BUILT_IN.other;
+  const found = locationIdFor(area, home);
+  const newPlace = found ? undefined : { id: newId(), name: area };
+  const locationId = found ?? newPlace!.id;
+  const withPlace = newPlace ? { ...home, places: [...(home.places ?? []), newPlace] } : home;
+  const slug = slugify(area);
+  const key = c.key ? `${locationId}/${c.key.replace(new RegExp(`(^|-)${regexEscape(slug)}(?=-|$)`, 'g'), '$1place')}` : '';
+  return { locationId, task: toTask(c.name, locationId, withPlace), key, ...(newPlace && { newPlace }) };
+}
+
+/** What to show for a chore: its location's current name, filled into its task. */
+export function resolveChore<T extends Pick<Chore, 'area' | 'name' | 'locationId' | 'task'>>(c: T, home: LinkHome): T {
+  if (!c.locationId) return c;
+  const area = locationName(c.locationId, home) ?? c.area;
+  return { ...c, area, name: (c.task ?? c.name).split(PLACE_TOKEN).join(area) };
+}
+
+/** Links chores saved before locations were relational. Their old fields stay as they are. */
+export function migrateChores(
+  chores: Array<Pick<Chore, 'id' | 'area' | 'name' | 'key' | 'locationId'>>,
+  home: LinkHome,
+  newId: () => string,
+): { patches: Array<[string, Pick<Chore, 'locationId' | 'task' | 'key'>]>; places: Place[] } {
+  const places: Place[] = [];
+  const patches: Array<[string, Pick<Chore, 'locationId' | 'task' | 'key'>]> = [];
+  for (const c of chores) {
+    if (c.locationId) continue;
+    const known = { ...home, places: [...(home.places ?? []), ...places] };
+    const { newPlace, ...link } = linkChore(c, known, newId);
+    if (newPlace) places.push(newPlace);
+    patches.push([c.id, link]);
+  }
+  return { patches, places };
+}
+
+/** Rooms being removed that still have chores. */
+export const removedRoomsInUse = (before: Room[], after: Room[], chores: Array<Pick<Chore, 'locationId'>>) =>
+  before.filter((r) => !after.some((x) => x.id === r.id) && chores.some((c) => c.locationId === r.id));
+
+/** Keeps a removed room's chores linked: the room lives on as a place, under the same id and name. */
+export const keepRoomsAsPlaces = (home: HomeConfig, rooms: Room[]): HomeConfig =>
+  rooms.length
+    ? { ...home, places: [...(home.places ?? []), ...rooms.map((r) => ({ id: r.id, name: r.name.trim() || 'Other' }))] }
+    : home;
 
 /** Place drawings (public/coloring/places/<key>.png), with an emoji stand-in for each. */
 const PLACE_EMOJI = {

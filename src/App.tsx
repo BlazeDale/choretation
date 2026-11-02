@@ -1,5 +1,5 @@
 import { onAuthStateChanged, type User } from 'firebase/auth';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { ChoreList } from './components/ChoreList';
 import { History } from './components/History';
 import { Login } from './components/Login';
@@ -9,6 +9,7 @@ import { Setup } from './components/Setup';
 import { Today } from './components/Today';
 import { fireAndForget, saveHousehold, syncLedger, updateChores, watchChores, watchHousehold } from './db';
 import { auth, firebaseConfigured } from './firebase';
+import { resolveChore } from './locations';
 import type { Chore, Household } from './types';
 import { DEFAULT_DAILY_LIMIT, coverFreeDays, todayStr } from './rotation';
 
@@ -36,8 +37,13 @@ type Tab = (typeof TABS)[number];
 function Main() {
   const [user, setUser] = useState<User | null | undefined>(undefined);
   const [household, setHousehold] = useState<Household | null | undefined>(undefined);
-  const [chores, setChores] = useState<Chore[]>([]);
+  const [storedChores, setChores] = useState<Chore[]>([]);
   const [tab, setTab] = useState<Tab>('Today');
+  // Everything below sees each chore with its location's current name.
+  const chores = useMemo(() => {
+    const home = household?.home;
+    return home ? storedChores.map((c) => resolveChore(c, home)) : storedChores;
+  }, [storedChores, household?.home]);
 
   useEffect(() => onAuthStateChanged(auth, setUser), []);
 
@@ -94,7 +100,7 @@ function Main() {
         </nav>
       </header>
       {tab === 'Today' && <Today {...props} />}
-      {tab === 'Chores' && <ChoreList {...props} rooms={household.home?.rooms ?? []} />}
+      {tab === 'Chores' && <ChoreList {...props} rooms={household.home?.rooms ?? []} places={household.home?.places} />}
       {tab === 'Print' && (
         <PrintMonth
           uid={user.uid}

@@ -1,4 +1,5 @@
 import { newId } from './format';
+import { floorName, linkChore } from './locations';
 import type { ChoreDraft, FeatureKey, Flooring, HomeConfig, PetKey, Room, RoomSize, RoomType } from './types';
 
 /** No single chore should take longer than this; bigger jobs get split into parts. */
@@ -118,7 +119,7 @@ export const DEFAULT_HOME: HomeConfig = {
   vehicles: 0,
 };
 
-export const levelName = (level: number) => (level === 0 ? 'Basement level' : `Floor ${level}`);
+export const levelName = floorName;
 
 const slug = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 const SIZE_FACTOR: Record<RoomSize, number> = { small: 0.7, medium: 1, large: 1.5 };
@@ -375,5 +376,9 @@ export function generateChores(h: HomeConfig, peopleCount: number): ChoreDraft[]
     add('Errands', 'Grocery run', 60, 7);
   }
 
-  return out;
+  // Every generated area is a room, floor or built-in, so none of these make a new place.
+  return out.map((d) => {
+    const { locationId, task, key } = linkChore(d, { rooms, places: h.places }, newId);
+    return { ...d, locationId, task, key };
+  });
 }

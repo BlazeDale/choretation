@@ -51,7 +51,15 @@ export type FeatureKey =
 
 export type PetKey = 'dogs' | 'cats' | 'fishTanks' | 'birds' | 'smallPets' | 'chickens';
 
+/** A location that isn't a room or floor, like one typed in for a custom chore. */
+export interface Place {
+  id: string;
+  name: string;
+}
+
 export interface HomeConfig {
+  /** Locations beyond the rooms, floors and built-in areas. */
+  places?: Place[];
   homeType: HomeType;
   /** Above-ground floors. */
   floors: number;
@@ -74,8 +82,14 @@ export interface Member {
 export interface ChoreDraft {
   /** Stable id from the generator (empty for custom chores), used to avoid re-adding. */
   key: string;
+  /** The location's name. Read from `locationId` once linked; kept in the database only as a fallback. */
   area: string;
+  /** What's shown: `task` with the location's current name filled in. */
   name: string;
+  /** Which location this is in: a room's id, `floor:<level>`, a built-in area or a place. */
+  locationId?: string;
+  /** The stored name, with {place} wherever the location's name goes. */
+  task?: string;
   minutes: number;
   everyDays: number;
   /** Pin to a day of the week (0 = Sunday). Only with weekly multiples, e.g. recycling every other Monday. */

@@ -1,10 +1,10 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
-import { addChores, deleteChore, fireAndForget, updateChore } from '../db';
-import { formatMinutes } from '../format';
+import { addChores, deleteChore, fireAndForget, savePlaces, updateChore } from '../db';
+import { formatMinutes, newId } from '../format';
 import { MAX_MINUTES } from '../generator';
-import { locationLabel } from '../locations';
+import { linkChore, locationLabel } from '../locations';
 import { memberLoads, nextWeekday, scheduleNew, todayStr, weekdayOf } from '../rotation';
-import type { Chore, ChoreDraft, Member, NewChore, Room } from '../types';
+import type { Chore, ChoreDraft, Member, NewChore, Place, Room } from '../types';
 import { FrequencySelect, MinutesInput, OwnerSelect, WeekdaySelect } from './inputs';
 import { ChoreCalendar } from './ChoreCalendar';
 import { EVERYONE, LocationFilter, PersonFilter, choresToShow, useLocationFilter, usePersonFilter } from './PersonFilter';
@@ -24,12 +24,14 @@ export function ChoreList({
   chores,
   members,
   rooms,
+  places,
   dailyLimit,
 }: {
   uid: string;
   chores: Chore[];
   members: Member[];
   rooms: Room[];
+  places?: Place[];
   dailyLimit: number;
 }) {
   const [view, setView] = useState<View>(readView);
@@ -40,8 +42,15 @@ export function ChoreList({
     editRef.current?.scrollIntoView({ block: 'center', behavior: 'smooth' });
   }, [editing]);
 
+  /** Ties typed chore details to their location, adding it if it's a new one. */
+  function link(d: Pick<ChoreDraft, 'area' | 'name'>) {
+    const { locationId, task, newPlace } = linkChore({ ...d, key: '' }, { rooms, places }, newId);
+    if (newPlace) fireAndForget(savePlaces(uid, [...(places ?? []), newPlace]));
+    return { locationId, task };
+  }
+
   function saveEdit(c: Chore, d: ChoreFields) {
-    const patch: Partial<NewChore> = { ...d, weekday: d.weekday ?? null };
+    const patch: Partial<NewChore> = { ...d, ...link(d), weekday: d.weekday ?? null };
     // A new weekday pin moves the chore to the next such day, like picking it in the row.
     if (d.weekday != null && d.weekday !== c.weekday) patch.nextDue = nextWeekday(todayStr(), d.weekday);
     save(c.id, patch);
@@ -59,6 +68,11 @@ export function ChoreList({
 
   const [who, setWho] = usePersonFilter(members);
   const allAreas = useMemo(() => [...new Set(chores.map((c) => c.area))].sort(), [chores]);
+  // Any location can take a chore, including rooms with none yet.
+  const formAreas = useMemo(
+    () => [...new Set([...allAreas, ...rooms.map((r) => r.name.trim()).filter(Boolean)])].sort(),
+    [allAreas, rooms],
+  );
   const [location, setLocation] = useLocationFilter(allAreas, rooms);
   const [search, setSearch] = useState('');
   const query = search.trim();
@@ -124,9 +138,9 @@ export function ChoreList({
       )}
 
       <AddChore
-        areas={allAreas}
+        areas={formAreas}
         onAdd={(draft) => {
-          fireAndForget(addChores(uid, scheduleNew([draft], chores, members)));
+          fireAndForget(addChores(uid, scheduleNew([{ ...draft, ...link(draft) }], chores, members)));
           setChanged(`Added "${draft.name}".`);
         }}
       />
@@ -170,7 +184,7 @@ export function ChoreList({
               editing === c.id ? (
                 <li key={c.id} ref={editRef} className="editing">
                   <ChoreForm
-                    areas={allAreas}
+                    areas={formAreas}
                     initial={c}
                     submitLabel="Save changes"
                     onCancel={() => setEditing(null)}

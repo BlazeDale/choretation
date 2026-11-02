@@ -2,6 +2,7 @@ import { signOut } from 'firebase/auth';
 import { useEffect, useState } from 'react';
 import { addChores, fireAndForget, saveHousehold, updateChores } from '../db';
 import { loadHomeDraft, saveHomeDraft, sameHome } from '../homeDraft';
+import { keepRoomsAsPlaces, removedRoomsInUse } from '../locations';
 import { auth } from '../firebase';
 import { newId } from '../format';
 import { DEFAULT_HOME, generateChores } from '../generator';
@@ -28,17 +29,34 @@ export function Settings({ uid, household, chores }: { uid: string; household: H
   const [newName, setNewName] = useState('');
   const savedHome: HomeConfig = { ...DEFAULT_HOME, ...household.home };
   // Unsaved edits come back after leaving the tab or reloading.
-  const [home, setHome] = useState<HomeConfig>(() => loadHomeDraft() ?? savedHome);
+  const [editedHome, setHome] = useState<HomeConfig>(() => loadHomeDraft() ?? savedHome);
+  // Places aren't edited here and can change while editing, so an older draft mustn't overwrite them.
+  const { places: _draftPlaces, ...editedFields } = editedHome;
+  const home: HomeConfig = { ...editedFields, ...(savedHome.places && { places: savedHome.places }) };
   const homeChanged = !sameHome(home, savedHome);
   const [homeSaved, setHomeSaved] = useState(false);
-  useEffect(() => saveHomeDraft(homeChanged ? home : null), [home, homeChanged]);
+  useEffect(() => saveHomeDraft(homeChanged ? editedHome : null), [editedHome, homeChanged]);
   const [reviewing, setReviewing] = useState(false);
   const [message, setMessage] = useState('');
   const [justAdded, setJustAdded] = useState(false);
   const dailyLimit = household.dailyLimit ?? DEFAULT_DAILY_LIMIT;
   const average = Math.round(averageDailyMinutes(chores, members));
 
-  const setMembers = (next: Member[]) => fireAndForget(saveHousehold(uid, { members: next }));
+  /** The home as it should be saved, or null if the person backs out of removing a room that has chores. */
+  function homeToSave(): HomeConfig | null {
+    const removed = removedRoomsInUse(savedHome.rooms, home.rooms, chores);
+    if (
+      removed.length &&
+      !confirm(
+        `${removed.map((r) => r.name).join(', ')} still has chores. Remove anyway? The chores stay on your list under that name, but won't belong to a floor.`,
+      )
+    ) {
+      return null;
+    }
+    return keepRoomsAsPlaces(home, removed);
+  }
+
+  const setMembers = (next: Member[]) =>fireAndForget(saveHousehold(uid, { members: next }));
 
   function removeMember(m: Member) {
     const remaining = members.filter((x) => x.id !== m.id);
@@ -74,8 +92,12 @@ export function Settings({ uid, household, chores }: { uid: string; household: H
           confirmLabel="Add to rotation"
           onBack={() => setReviewing(false)}
           onConfirm={async (chosen) => {
+            const next = homeToSave();
+            if (!next) return;
+            // The home first, so a chore in a new room never points at nothing.
+            await saveHousehold(uid, { home: next });
             await addChores(uid, scheduleNew(chosen, chores, members));
-            await saveHousehold(uid, { home });
+            setHome(next);
             setReviewing(false);
             setMessage(`Added ${chosen.length} chores.`);
             setJustAdded(chosen.length > 0);
@@ -226,7 +248,10 @@ export function Settings({ uid, household, chores }: { uid: string; household: H
             className={homeChanged ? 'primary' : ''}
             disabled={!homeChanged}
             onClick={() => {
-              fireAndForget(saveHousehold(uid, { home }));
+              const next = homeToSave();
+              if (!next) return;
+              fireAndForget(saveHousehold(uid, { home: next }));
+              setHome(next);
               setHomeSaved(true);
             }}
           >

@@ -2,6 +2,7 @@ import {
   collection,
   deleteDoc,
   doc,
+  getDocFromServer,
   getDocsFromServer,
   limit,
   onSnapshot,
@@ -13,9 +14,11 @@ import {
   writeBatch,
 } from 'firebase/firestore';
 import { db } from './firebase';
+import { newId } from './format';
 import { closeMonths, expiredMonths, keepSince, monthKey, planMonth, samePlan } from './ledger';
+import { migrateChores, resolveChore } from './locations';
 import { todayStr } from './rotation';
-import type { Chore, ChoreTurn, HistoryEntry, Household, Member, MonthRecord, NewChore } from './types';
+import type { Chore, ChoreTurn, HistoryEntry, Household, Member, MonthRecord, NewChore, Place } from './types';
 
 // Layout: households/{uid} with `chores`, `history` and `months` subcollections.
 const householdRef = (uid: string) => doc(db, 'households', uid);
@@ -31,6 +34,11 @@ export function watchHousehold(uid: string, cb: (h: Household | null) => void) {
 
 export function saveHousehold(uid: string, data: Partial<Household>) {
   return setDoc(householdRef(uid), data, { merge: true });
+}
+
+/** Saves the home's extra locations, leaving the rest of the home as it is. */
+export function savePlaces(uid: string, places: Place[]) {
+  return setDoc(householdRef(uid), { home: { places } }, { merge: true });
 }
 
 export function watchChores(uid: string, cb: (chores: Chore[]) => void) {
@@ -123,10 +131,25 @@ async function deleteInBatches(refs: Array<Parameters<ReturnType<typeof writeBat
  * on data fresh from the server, never on a possibly stale local cache; offline it waits for next time.
  */
 export async function syncLedger(uid: string, members: Member[], dailyLimit: number) {
-  const [choreDocs, monthDocs] = await Promise.all([getDocsFromServer(choresCol(uid)), getDocsFromServer(monthsCol(uid))]);
+  const [choreDocs, monthDocs, householdDoc] = await Promise.all([
+    getDocsFromServer(choresCol(uid)),
+    getDocsFromServer(monthsCol(uid)),
+    getDocFromServer(householdRef(uid)),
+  ]);
   let chores = choreDocs.docs.map((d) => ({ ...(d.data() as NewChore), id: d.id }));
   // No chores back from the server means nothing to go on, and nothing should be expired because of it.
   if (!chores.length) return;
+
+  // Links any chores saved before locations were relational. New places go first, so no link dangles.
+  const home = (householdDoc.data() as Household | undefined)?.home;
+  if (!home) return;
+  const { patches: links, places } = migrateChores(chores, home, newId);
+  const linkedHome = places.length ? { ...home, places: [...(home.places ?? []), ...places] } : home;
+  if (places.length) await savePlaces(uid, linkedHome.places!);
+  if (links.length) await updateChores(uid, links);
+  const linked = new Map(links);
+  chores = chores.map((c) => resolveChore({ ...c, ...linked.get(c.id) }, linkedHome));
+
   let records = monthDocs.docs.map((d) => d.data() as MonthRecord);
   const today = todayStr();
 
