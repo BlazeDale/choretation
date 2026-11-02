@@ -1,6 +1,7 @@
 import { signOut } from 'firebase/auth';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { addChores, fireAndForget, saveHousehold, updateChores } from '../db';
+import { loadHomeDraft, saveHomeDraft, sameHome } from '../homeDraft';
 import { auth } from '../firebase';
 import { newId } from '../format';
 import { DEFAULT_HOME, generateChores } from '../generator';
@@ -25,7 +26,12 @@ import { ThemePicker } from './ThemePicker';
 export function Settings({ uid, household, chores }: { uid: string; household: Household; chores: Chore[] }) {
   const { members } = household;
   const [newName, setNewName] = useState('');
-  const [home, setHome] = useState<HomeConfig>({ ...DEFAULT_HOME, ...household.home });
+  const savedHome: HomeConfig = { ...DEFAULT_HOME, ...household.home };
+  // Unsaved edits come back after leaving the tab or reloading.
+  const [home, setHome] = useState<HomeConfig>(() => loadHomeDraft() ?? savedHome);
+  const homeChanged = !sameHome(home, savedHome);
+  const [homeSaved, setHomeSaved] = useState(false);
+  useEffect(() => saveHomeDraft(homeChanged ? home : null), [home, homeChanged]);
   const [reviewing, setReviewing] = useState(false);
   const [message, setMessage] = useState('');
   const [justAdded, setJustAdded] = useState(false);
@@ -186,19 +192,47 @@ export function Settings({ uid, household, chores }: { uid: string; household: H
         </p>
         <RedistributeButton uid={uid} chores={chores} members={members} dailyLimit={dailyLimit} label="Redistribute across days" />
         <p className="hint">
-          Moves due dates (each within one cycle of today) and assignees so no day piles up. Frequencies and times stay the
-          same.
+          Moves due dates and assignees so no day piles up, keeping chores rarer than weekly close to when they're really due.
+          Frequencies and times stay the same.
         </p>
       </section>
 
       <section className="card-panel">
         <h2>Home</h2>
-        <p className="hint">Changed something? Update it here and add any chores that now apply. Existing chores are untouched.</p>
-        <HomeForm value={home} onChange={setHome} />
+        <p className="hint">
+          Changed something? Update it here and save. Existing chores are untouched; find new chores to add any that now apply.
+        </p>
+        <HomeForm
+          value={home}
+          onChange={(h) => {
+            setHome(h);
+            setHomeSaved(false);
+          }}
+        />
+        {homeChanged && <p className="notice">You have unsaved changes to your home.</p>}
+        {homeSaved && !homeChanged && <p className="notice">Home saved.</p>}
         <div className="actions">
-          <button className="primary" onClick={() => setReviewing(true)}>
-            Find new chores ({newDrafts.length})
+          {homeChanged && (
+            <button
+              onClick={() => {
+                if (!confirm('Discard your unsaved changes to your home?')) return;
+                setHome(savedHome);
+              }}
+            >
+              Discard changes
+            </button>
+          )}
+          <button
+            className={homeChanged ? 'primary' : ''}
+            disabled={!homeChanged}
+            onClick={() => {
+              fireAndForget(saveHousehold(uid, { home }));
+              setHomeSaved(true);
+            }}
+          >
+            Save home
           </button>
+          <button onClick={() => setReviewing(true)}>Find new chores ({newDrafts.length})</button>
         </div>
       </section>
 
