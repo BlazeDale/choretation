@@ -36,6 +36,7 @@ export function History({ uid, members }: { uid: string; members: Member[] }) {
               <span className="grow">{e.choreName}</span>
               <span className="meta">
                 {nameOf(e.memberId)} · {formatMinutes(e.minutes)} · {e.date}
+                {e.assumed && ' · not ticked, counted as done'}
               </span>
             </li>
           ))}

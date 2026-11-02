@@ -10,6 +10,7 @@ A household chore rotation app. Describe your home, get a chore list where nothi
 
 - **Generator** (`src/generator.ts`): turns rooms, floors, pets, yard, appliances etc. into chores with a time estimate and a frequency. Anything over 120 minutes is split into parts (e.g. "Mow lawn (part 1 of 2)"). Floor-wide jobs scale with rooms per floor.
 - **Rotation** (`src/rotation.ts`): each chore costs `minutes × 7 / everyDays` per week. New chores go to whoever has the least weekly load. When a chore is marked done, its next due date is set from today and it passes to the least-loaded *other* person. "Rebalance" in Settings reassigns everything from scratch.
+- **Month records** (`src/ledger.ts`): each month's plan is saved as it goes, and days already past never change. When a month ends it closes for good: a chore still waiting is counted as done on its planned date and carries on from there, so rare chores keep their cadence even when only the paper charts are used. Records fall off once they're older than the longest chore period. "Redistribute" keeps chores rarer than weekly within two weeks of when they're really due.
 - **Star chart** (Print tab): a printable monthly chart per person with stars to color in, a jar to fill, and a reward line. Since assignments rotate, it simulates the month assuming each chore is done on its due date.
 
 ## Setup
@@ -53,7 +54,8 @@ Firebase Hosting also still works (`npm run deploy`), serving from the site root
 ```
 households/{uid}              name, members[{id,name}], home{...}
 households/{uid}/chores/{id}  key, area, name, minutes, everyDays, assigneeId, nextDue, lastDone, lastDoneBy, active
-households/{uid}/history/{id} choreId, choreName, memberId, minutes, date, at
+households/{uid}/history/{id} choreId, choreName, memberId, minutes, date, at, area, assumed
+households/{uid}/months/{YYYY-MM}  month, planned[{choreId,name,area,minutes,date,memberId}], closed
 ```
 
 Security rules (`firestore.rules`) only let the signed-in household account read and write its own data. See [SECURITY.md](SECURITY.md) for what is protected and the remaining owner checklist.

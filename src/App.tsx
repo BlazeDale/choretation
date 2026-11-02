@@ -7,7 +7,7 @@ import { PrintMonth } from './components/PrintMonth';
 import { Settings } from './components/Settings';
 import { Setup } from './components/Setup';
 import { Today } from './components/Today';
-import { fireAndForget, saveHousehold, updateChores, watchChores, watchHousehold } from './db';
+import { fireAndForget, saveHousehold, syncLedger, updateChores, watchChores, watchHousehold } from './db';
 import { auth, firebaseConfigured } from './firebase';
 import type { Chore, Household } from './types';
 import { DEFAULT_DAILY_LIMIT, coverFreeDays, todayStr } from './rotation';
@@ -61,6 +61,16 @@ function Main() {
     if (!user || !household?.members?.length || !chores.length) return;
     const moved = coverFreeDays(chores, household.members, household.dailyLimit ?? DEFAULT_DAILY_LIMIT, todayStr());
     if (moved.length) fireAndForget(updateChores(user.uid, moved));
+  }, [user, household, chores]);
+
+  // Locks in past days and closes finished months, once changes have settled. Runs quietly: offline
+  // or failed attempts just wait for the next change or visit.
+  useEffect(() => {
+    if (!user || !household?.members?.length || !chores.length) return;
+    const members = household.members;
+    const limit = household.dailyLimit ?? DEFAULT_DAILY_LIMIT;
+    const timer = setTimeout(() => syncLedger(user.uid, members, limit).catch(console.warn), 2000);
+    return () => clearTimeout(timer);
   }, [user, household, chores]);
 
   if (user === undefined) return <div className="center">Loading…</div>;

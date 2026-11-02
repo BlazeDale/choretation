@@ -1,9 +1,11 @@
-import { useMemo, useState, type CSSProperties } from 'react';
+import { useEffect, useMemo, useState, type CSSProperties } from 'react';
 import { artKey } from '../choreArt';
+import { watchHistoryBetween, watchMonth } from '../db';
 import { formatMinutes } from '../format';
+import { keepSince, monthKey, monthLog, type LogStatus } from '../ledger';
 import { compactName, locationsFor } from '../locations';
-import { headsUps, projectMonth, todayStr, weekdayOf } from '../rotation';
-import type { Chore, Member, Room } from '../types';
+import { headsUps, monthBounds, projectMonth, todayStr, weekdayOf } from '../rotation';
+import type { Chore, HistoryEntry, Member, MonthRecord, Room } from '../types';
 import { ArtImg, LocationMark } from './Art';
 
 /** One crayon per person, in member order. */
@@ -14,9 +16,17 @@ const MONTHS_AHEAD = 5;
 const SHOWN = 4;
 
 interface Due {
-  chore: Chore;
+  chore: Pick<Chore, 'id' | 'name' | 'area' | 'minutes'>;
   memberId: string | null;
+  /** Set on days already past, which come from the locked record instead of the live rotation. */
+  status?: LogStatus;
 }
+
+const STATUS_TEXT: Record<LogStatus, string> = {
+  ticked: 'Done',
+  assumed: 'Not ticked, counted as done',
+  waiting: 'Not ticked yet',
+};
 
 /**
  * The month's chores as a colored-in calendar: each person has a crayon, each day shows a picture
@@ -24,12 +34,14 @@ interface Due {
  * Hollow crayon rings by the date mark who has the day off.
  */
 export function ChoreCalendar({
+  uid,
   chores,
   members,
   rooms,
   dailyLimit,
   onEdit,
 }: {
+  uid: string;
   chores: Chore[];
   members: Member[];
   rooms: Room[];
@@ -56,19 +68,49 @@ export function ChoreCalendar({
     return i < 0 ? 'var(--muted)' : CRAYONS[i % CRAYONS.length];
   };
   const avatarOf = (id: string | null) => members.find((m) => m.id === id)?.avatar;
-  const locations = useMemo(() => locationsFor(chores.map((c) => c.area), rooms), [chores, rooms]);
+  const { first: monthFirst, last: monthLast } = monthBounds(year, month0);
+  const hasPast = monthFirst < today;
+  // Back as far as records are kept: the longest chore period.
+  const since = keepSince(chores, today);
+  const oldest = since ? new Date(`${monthKey(since)}-01T12:00`) : now;
+  const minOffset = (oldest.getFullYear() - now.getFullYear()) * 12 + oldest.getMonth() - now.getMonth();
+
+  const [record, setRecord] = useState<MonthRecord | null>(null);
+  const [done, setDone] = useState<HistoryEntry[]>([]);
+  useEffect(() => {
+    setRecord(null);
+    setDone([]);
+    if (!hasPast) return;
+    const offMonth = watchMonth(uid, `${year}-${String(month0 + 1).padStart(2, '0')}`, setRecord);
+    const offDone = watchHistoryBetween(uid, monthFirst, monthLast, setDone);
+    return () => {
+      offMonth();
+      offDone();
+    };
+  }, [uid, year, month0, hasPast, monthFirst, monthLast]);
+
+  const locations = useMemo(
+    () => locationsFor([...chores.map((c) => c.area), ...(record?.planned ?? []).map((p) => p.area)], rooms),
+    [chores, record, rooms],
+  );
 
   const byDay = useMemo(() => {
     const byId = new Map(chores.map((c) => [c.id, c]));
     const map = new Map<number, Due[]>();
+    const add = (date: string, due: Due) => {
+      if (who && due.memberId !== who) return;
+      const d = Number(date.slice(8));
+      map.set(d, [...(map.get(d) ?? []), due]);
+    };
+    for (const i of monthLog(record?.planned ?? [], done, today)) {
+      add(i.date, { chore: { id: i.choreId, name: i.name, area: i.area, minutes: i.minutes }, memberId: i.memberId, status: i.status });
+    }
     for (const o of projectMonth(chores, members, year, month0, today, dailyLimit)) {
-      if (who && o.memberId !== who) continue;
-      const d = Number(o.date.slice(8));
-      map.set(d, [...(map.get(d) ?? []), { chore: byId.get(o.choreId)!, memberId: o.memberId }]);
+      add(o.date, { chore: byId.get(o.choreId)!, memberId: o.memberId });
     }
     for (const list of map.values()) list.sort((a, b) => b.chore.minutes - a.chore.minutes);
     return map;
-  }, [chores, members, year, month0, today, dailyLimit, who]);
+  }, [chores, members, year, month0, today, dailyLimit, who, record, done]);
 
   const soonByDay = useMemo(() => {
     const byId = new Map(chores.map((c) => [c.id, c]));
@@ -93,7 +135,7 @@ export function ChoreCalendar({
     <div className="ccal">
       <div className="ccal-bar">
         <div className="ccal-month">
-          <button className="ccal-arrow" onClick={() => goMonth(offset - 1)} disabled={offset === 0} aria-label="Previous month">
+          <button className="ccal-arrow" onClick={() => goMonth(offset - 1)} disabled={offset <= minOffset} aria-label="Previous month">
             ‹
           </button>
           <h2>
@@ -145,7 +187,7 @@ export function ChoreCalendar({
             <button
               key={i}
               className={cls}
-              disabled={past}
+              disabled={past && !list.length}
               onClick={() => setPicked(picked === d ? null : d)}
               aria-label={`${monthName} ${d}: ${list.length ? `${list.length} chores` : off ? 'day off' : 'no chores'}`}
               aria-expanded={picked === d}
@@ -215,15 +257,18 @@ export function ChoreCalendar({
                   <strong>{x.chore.name}</strong>
                   <span className="meta">
                     <LocationMark loc={locations.get(x.chore.area)} /> {x.chore.area}, {formatMinutes(x.chore.minutes)}
+                    {x.status && `, ${STATUS_TEXT[x.status]}`}
                   </span>
                 </span>
                 <span className="ccal-who">
                   <span className="ccal-dot" />
                   {members.find((m) => m.id === x.memberId)?.name ?? 'Unassigned'}
                 </span>
-                <button className="link" onClick={() => onEdit(x.chore.id)}>
-                  Edit
-                </button>
+                {!x.status && (
+                  <button className="link" onClick={() => onEdit(x.chore.id)}>
+                    Edit
+                  </button>
+                )}
               </li>
             ))}
           </ul>

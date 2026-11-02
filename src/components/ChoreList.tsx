@@ -93,6 +93,7 @@ export function ChoreList({
       <div>
         {switcher}
         <ChoreCalendar
+          uid={uid}
           chores={chores}
           members={members}
           rooms={rooms}

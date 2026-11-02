@@ -115,4 +115,25 @@ export interface HistoryEntry {
   minutes: number;
   date: string;
   at: number;
+  area?: string;
+  /** Never ticked in the app: counted as done on its planned date when its month closed. */
+  assumed?: boolean;
+}
+
+/** One chore on a day's plan, copied so it survives the chore being changed or deleted later. */
+export interface PlannedChore {
+  choreId: string;
+  name: string;
+  area: string;
+  minutes: number;
+  date: string;
+  memberId: string | null;
+}
+
+/** A month's plan. Days before today never change, and a closed month never changes at all. */
+export interface MonthRecord {
+  /** YYYY-MM, also the document id. */
+  month: string;
+  planned: PlannedChore[];
+  closed: boolean;
 }

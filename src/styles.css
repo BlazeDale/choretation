@@ -199,7 +199,8 @@ h4.level { margin: 12px 0 6px; font-size: 0.95rem; }
 .ccal-cell:hover:not(:disabled) { border-color: var(--text); }
 .ccal-cell:focus-visible { outline: 2.5px solid var(--brand); outline-offset: 2px; }
 .ccal-cell.blank { background: none; border-style: dashed; }
-.ccal-cell.past { opacity: 0.45; cursor: default; }
+.ccal-cell.past { opacity: 0.6; }
+.ccal-cell.past:disabled { opacity: 0.45; cursor: default; }
 .ccal-cell.picked { border-color: var(--text); box-shadow: 0 0 0 1.5px var(--text); }
 .ccal-num { font-family: 'Fredoka', system-ui, sans-serif; font-weight: 600; font-size: 1.05rem; line-height: 1; align-self: flex-start; padding: 3px 5px; }
 /* Who has the day off: an uncolored ring in their crayon. */

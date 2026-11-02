@@ -301,9 +301,29 @@ const HORIZON = 365;
 /** Days ahead where a pile-up is weighted most, since that's what people see first. */
 const NEAR = 28;
 
+/** Longest a chore's due date may be nudged from its cadence when spreading chores out. */
+const MAX_NUDGE_DAYS = 14;
+
+/**
+ * Which days from today a chore may land on when redistributing. Weekly-or-more-often chores can go
+ * anywhere in their period. Rarer ones that have been done stay close to last done + period, so
+ * spreading can't quietly change a six-month chore's cadence. Ones never done have no cadence yet, so
+ * they can come any time sooner, or as late as halfway through a period from now if that's later.
+ */
+export function dueWindow(c: Pick<Chore, 'everyDays' | 'lastDone' | 'nextDue'>, today: string): [number, number] {
+  const p = Math.max(1, c.everyDays);
+  const latestPossible = Math.min(p, HORIZON) - 1;
+  if (p <= 7) return [0, latestPossible];
+  const nudge = Math.min(MAX_NUDGE_DAYS, Math.floor(p / 4));
+  const due = daysUntil(c.lastDone ? addDays(c.lastDone, p) : c.nextDue, today);
+  if (!c.lastDone) return [0, Math.min(latestPossible, Math.max(due, Math.floor(p / 2)))];
+  const earliest = Math.min(latestPossible, Math.max(0, due - nudge));
+  return [earliest, Math.max(earliest, Math.min(latestPossible, Math.max(0, due) + nudge))];
+}
+
 /**
  * Re-plans due dates and assignees so chores spread evenly across days. Each chore keeps its
- * frequency and is due within one period from today; chores pinned to a weekday keep their dates.
+ * frequency and stays within its dueWindow; chores pinned to a weekday keep their dates.
  * People's free days lower that day's capacity, and nobody is given a chore on their free day.
  * Chores fixed to someone keep that person and are spread over their own working days. Chores are placed on the offset that keeps
  * the busiest of its days lowest (most constrained first), aiming to keep the household under
@@ -365,10 +385,11 @@ export function redistribute(
     const land = landFor(cap);
     const load = owner ? loadOf(owner) : total;
     const p = Math.max(1, c.everyDays);
-    const current = Math.min(p - 1, Math.max(0, daysUntil(c.nextDue, today)));
+    const [earliest, latest] = dueWindow(c, today);
+    const current = Math.max(earliest, Math.min(latest, Math.max(0, daysUntil(c.nextDue, today))));
     // The first date must be a working day; later repeats get moved off days off as they come up.
-    const starts = Array.from({ length: Math.min(p, HORIZON) }, (_, o) => o).filter((o) => cap(o));
-    if (!starts.length) starts.push(land(0));
+    const starts = Array.from({ length: latest - earliest + 1 }, (_, i) => earliest + i).filter((o) => cap(o));
+    if (!starts.length) starts.push(land(earliest));
     let best = starts[0];
     let bestScore = Infinity;
     for (const o of starts) {
