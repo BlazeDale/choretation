@@ -2,11 +2,12 @@ import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { addChores, deleteChore, fireAndForget, updateChore } from '../db';
 import { formatMinutes } from '../format';
 import { MAX_MINUTES } from '../generator';
+import { locationLabel } from '../locations';
 import { memberLoads, nextWeekday, scheduleNew, todayStr, weekdayOf } from '../rotation';
 import type { Chore, ChoreDraft, Member, NewChore, Room } from '../types';
 import { FrequencySelect, MinutesInput, OwnerSelect, WeekdaySelect } from './inputs';
 import { ChoreCalendar } from './ChoreCalendar';
-import { EVERYONE, PersonFilter, isTheirs, usePersonFilter } from './PersonFilter';
+import { EVERYONE, LocationFilter, PersonFilter, choresToShow, useLocationFilter, usePersonFilter } from './PersonFilter';
 import { RedistributeButton } from './Redistribute';
 
 type View = 'list' | 'calendar';
@@ -58,13 +59,15 @@ export function ChoreList({
 
   const [who, setWho] = usePersonFilter(members);
   const allAreas = useMemo(() => [...new Set(chores.map((c) => c.area))].sort(), [chores]);
+  const [location, setLocation] = useLocationFilter(allAreas, rooms);
   const groups = useMemo(() => {
     const m = new Map<string, Chore[]>();
-    const shown = chores.filter((c) => isTheirs(c, who)).sort((a, b) => a.name.localeCompare(b.name));
+    const shown = choresToShow(chores, who, location, rooms, editing).sort((a, b) => a.name.localeCompare(b.name));
     for (const c of shown) m.set(c.area, [...(m.get(c.area) ?? []), c]);
     return [...m.entries()].sort((a, b) => a[0].localeCompare(b[0]));
-  }, [chores, who]);
+  }, [chores, who, location, rooms, editing]);
   const whoName = members.find((m) => m.id === who)?.name;
+  const inPlace = location && ` for ${locationLabel(location)}`;
 
   const loads = memberLoads(chores, members);
 
@@ -134,13 +137,16 @@ export function ChoreList({
       )}
 
       <PersonFilter members={members} value={who} onChange={setWho} />
+      <LocationFilter areas={allAreas} rooms={rooms} value={location} onChange={setLocation} />
       {who !== EVERYONE && (
         <p className="hint">
-          {groups.reduce((n, [, items]) => n + items.length, 0)} chores: always {whoName}'s, plus rotating ones where it's{' '}
-          {whoName}'s turn.
+          {groups.reduce((n, [, items]) => n + items.length, 0)} chores{inPlace}: always {whoName}'s, plus rotating ones where
+          it's {whoName}'s turn.
         </p>
       )}
-      {!groups.length && <p className="empty">Nothing on {whoName}'s list right now.</p>}
+      {!groups.length && (
+        <p className="empty">{whoName ? `Nothing${inPlace} on ${whoName}'s list right now.` : 'No chores yet.'}</p>
+      )}
       {groups.map(([area, items]) => (
         <section key={area} className="group">
           <h3>{area}</h3>

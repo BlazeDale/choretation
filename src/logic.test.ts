@@ -212,7 +212,7 @@ describe('rotation', () => {
       const before = crew.map(({ id, name }) => ({ id, name }));
       const all = scheduleNew(generateChores(big, 3), [], before, wed).map((c, i) => ({ ...c, id: String(i) }));
       const after = before.map((m) => (m.id === 'c' ? { ...m, freeDays: [3] } : m));
-      const moved = new Map(coverFreeDays(all, after));
+      const moved = new Map(coverFreeDays(all, after, 60, wed));
       const fixed = all.map((c) => ({ ...c, ...moved.get(c.id) }));
       expect(fixed.filter((c) => c.assigneeId === 'c' && weekday(c.nextDue) === 3)).toEqual([]);
       const nov = projectMonth(all, after, 2026, 10, wed); // even without saving the handover

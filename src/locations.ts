@@ -51,6 +51,34 @@ export function locationsFor(areas: string[], rooms: Room[]): Map<string, Locati
   return out;
 }
 
+/** The floor an area is on: its room's level, or the generator's per-floor areas. Null for "Pets", "Whole home" and so on. */
+export function areaLevel(area: string, rooms: Room[]): number | null {
+  const name = area.trim().toLowerCase();
+  const room = rooms.find((r) => r.name.trim().toLowerCase() === name);
+  if (room) return room.level;
+  if (name === 'basement level') return 0;
+  const floor = /^floor (\d+)$/.exec(name);
+  return floor ? Number(floor[1]) : null;
+}
+
+/** "1st floor", "2nd floor"; level 0 is the basement. */
+export const floorLabel = (level: number) =>
+  level === 0 ? 'Basement' : `${['1st', '2nd', '3rd'][level - 1] ?? `${level}th`} floor`;
+
+/** Floors that have chores, lowest first. */
+export const floorsOf = (areas: string[], rooms: Room[]) =>
+  [...new Set(areas.map((a) => areaLevel(a, rooms)).filter((l) => l != null))].sort((a, b) => a - b);
+
+const FLOOR_PREFIX = 'floor:';
+/** A location filter is either an area's name or one of these. */
+export const floorFilter = (level: number) => `${FLOOR_PREFIX}${level}`;
+
+export const inLocation = (area: string, location: string, rooms: Room[]) =>
+  location.startsWith(FLOOR_PREFIX) ? floorFilter(areaLevel(area, rooms) ?? -1) === location : area === location;
+
+export const locationLabel = (location: string) =>
+  location.startsWith(FLOOR_PREFIX) ? floorLabel(Number(location.slice(FLOOR_PREFIX.length))) : location;
+
 const escape = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 /**
