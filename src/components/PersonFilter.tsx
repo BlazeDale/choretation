@@ -67,10 +67,25 @@ export function useLocationFilter(areas: string[], rooms: Room[]): [string, (loc
 }
 
 /** What the list shows. The chore being edited always stays, so opening one from the calendar can't hide it. */
-export const choresToShow = (chores: Chore[], who: string, location: string, rooms: Room[], editing: string | null = null) =>
+export const choresToShow = (
+  chores: Chore[],
+  who: string,
+  location: string,
+  rooms: Room[],
+  search = '',
+  editing: string | null = null,
+) =>
   chores.filter(
-    (c) => c.id === editing || (isTheirs(c, who) && (location === ALL_LOCATIONS || inLocation(c.area, location, rooms))),
+    (c) =>
+      c.id === editing ||
+      (isTheirs(c, who) && (location === ALL_LOCATIONS || inLocation(c.area, location, rooms)) && matchesSearch(c, search)),
   );
+
+/** Every word typed appears in the chore's name or area, in any order. */
+export function matchesSearch(c: Pick<Chore, 'name' | 'area'>, search: string) {
+  const text = `${c.name} ${c.area}`.toLowerCase();
+  return search.toLowerCase().split(/\s+/).every((word) => text.includes(word));
+}
 
 export function LocationFilter({
   areas,
@@ -85,26 +100,24 @@ export function LocationFilter({
 }) {
   const floors = floorsOf(areas, rooms);
   return (
-    <div className="filters">
-      <select aria-label="Show chores in" value={value} onChange={(e) => onChange(e.target.value)}>
-        <option value={ALL_LOCATIONS}>All locations</option>
-        {floors.length > 1 && (
-          <optgroup label="Floors">
-            {floors.map((l) => (
-              <option key={l} value={floorFilter(l)}>
-                {floorLabel(l)}
-              </option>
-            ))}
-          </optgroup>
-        )}
-        <optgroup label="Rooms and areas">
-          {areas.map((a) => (
-            <option key={a} value={a}>
-              {a}
+    <select aria-label="Show chores in" value={value} onChange={(e) => onChange(e.target.value)}>
+      <option value={ALL_LOCATIONS}>All locations</option>
+      {floors.length > 1 && (
+        <optgroup label="Floors">
+          {floors.map((l) => (
+            <option key={l} value={floorFilter(l)}>
+              {floorLabel(l)}
             </option>
           ))}
         </optgroup>
-      </select>
-    </div>
+      )}
+      <optgroup label="Rooms and areas">
+        {areas.map((a) => (
+          <option key={a} value={a}>
+            {a}
+          </option>
+        ))}
+      </optgroup>
+    </select>
   );
 }

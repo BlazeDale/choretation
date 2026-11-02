@@ -77,7 +77,24 @@ describe('choresToShow', () => {
   });
 
   it('keeps the chore being edited even when the filters would hide it', () => {
-    expect(ids(choresToShow(chores, 'a', floorFilter(1), rooms, '2'))).toEqual(['1', '2']);
+    expect(ids(choresToShow(chores, 'a', floorFilter(1), rooms, '', '2'))).toEqual(['1', '2']);
+    expect(ids(choresToShow(chores, EVERYONE, ALL_LOCATIONS, rooms, 'nothing like this', '2'))).toEqual(['2']);
+  });
+
+  it('searches names and areas, ignoring case and word order', () => {
+    const list = [chore('1', 'Kitchen', 'a'), chore('2', 'Bathroom 2', 'a')];
+    list[0].name = 'Mop floor';
+    list[1].name = 'Scrub shower / tub';
+    expect(ids(choresToShow(list, EVERYONE, ALL_LOCATIONS, rooms, 'MOP'))).toEqual(['1']);
+    expect(ids(choresToShow(list, EVERYONE, ALL_LOCATIONS, rooms, 'bathroom'))).toEqual(['2']);
+    expect(ids(choresToShow(list, EVERYONE, ALL_LOCATIONS, rooms, 'tub scrub'))).toEqual(['2']);
+    expect(ids(choresToShow(list, EVERYONE, ALL_LOCATIONS, rooms, 'mop tub'))).toEqual([]);
+    expect(ids(choresToShow(list, EVERYONE, ALL_LOCATIONS, rooms, ''))).toEqual(['1', '2']);
+  });
+
+  it('combines search with person and location', () => {
+    expect(ids(choresToShow(chores, 'b', floorFilter(1), rooms, 'chore'))).toEqual(['2']);
+    expect(ids(choresToShow(chores, 'a', floorFilter(1), rooms, 'chore 2'))).toEqual([]);
   });
 });
 

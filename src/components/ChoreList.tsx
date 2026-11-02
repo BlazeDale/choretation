@@ -60,14 +60,16 @@ export function ChoreList({
   const [who, setWho] = usePersonFilter(members);
   const allAreas = useMemo(() => [...new Set(chores.map((c) => c.area))].sort(), [chores]);
   const [location, setLocation] = useLocationFilter(allAreas, rooms);
+  const [search, setSearch] = useState('');
+  const query = search.trim();
   const groups = useMemo(() => {
     const m = new Map<string, Chore[]>();
-    const shown = choresToShow(chores, who, location, rooms, editing).sort((a, b) => a.name.localeCompare(b.name));
+    const shown = choresToShow(chores, who, location, rooms, query, editing).sort((a, b) => a.name.localeCompare(b.name));
     for (const c of shown) m.set(c.area, [...(m.get(c.area) ?? []), c]);
     return [...m.entries()].sort((a, b) => a[0].localeCompare(b[0]));
-  }, [chores, who, location, rooms, editing]);
+  }, [chores, who, location, rooms, query, editing]);
   const whoName = members.find((m) => m.id === who)?.name;
-  const inPlace = location && ` for ${locationLabel(location)}`;
+  const scope = `${query ? ` matching "${query}"` : ''}${location ? ` for ${locationLabel(location)}` : ''}`;
 
   const loads = memberLoads(chores, members);
 
@@ -137,15 +139,27 @@ export function ChoreList({
       )}
 
       <PersonFilter members={members} value={who} onChange={setWho} />
-      <LocationFilter areas={allAreas} rooms={rooms} value={location} onChange={setLocation} />
+      <div className="filters">
+        <LocationFilter areas={allAreas} rooms={rooms} value={location} onChange={setLocation} />
+        <input
+          type="search"
+          className="chore-search"
+          placeholder="Search chores"
+          aria-label="Search chores"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+        />
+      </div>
       {who !== EVERYONE && (
         <p className="hint">
-          {groups.reduce((n, [, items]) => n + items.length, 0)} chores{inPlace}: always {whoName}'s, plus rotating ones where
-          it's {whoName}'s turn.
+          {groups.reduce((n, [, items]) => n + items.length, 0)} chores{scope}: always {whoName}'s, plus rotating ones where it's{' '}
+          {whoName}'s turn.
         </p>
       )}
       {!groups.length && (
-        <p className="empty">{whoName ? `Nothing${inPlace} on ${whoName}'s list right now.` : 'No chores yet.'}</p>
+        <p className="empty">
+          {whoName ? `Nothing${scope} on ${whoName}'s list right now.` : scope ? `No chores${scope}.` : 'No chores yet.'}
+        </p>
       )}
       {groups.map(([area, items]) => (
         <section key={area} className="group">

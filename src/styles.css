@@ -114,6 +114,7 @@ h4.level { margin: 12px 0 6px; font-size: 0.95rem; }
 .unit { color: var(--muted); font-size: 0.85rem; margin-right: 4px; }
 
 .filters { display: flex; gap: 6px; flex-wrap: wrap; margin: 12px 0; }
+.chore-search { flex: 1 1 180px; }
 .chip { border-radius: 999px; padding: 5px 14px; }
 .chip.on { background: var(--brand); color: var(--on-brand); border-color: var(--brand); }
 .member { margin-bottom: 12px; }
